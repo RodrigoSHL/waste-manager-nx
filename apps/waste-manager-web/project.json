@@ -1,0 +1,28 @@
+{
+  "name": "waste-manager-web",
+  "projectType": "application",
+  "sourceRoot": "apps/waste-manager-web/app",
+  "targets": {
+    "build": {
+      "executor": "@nx/next:build",
+      "options": {
+        "outputPath": "dist/apps/waste-manager-web",
+        "root": "apps/waste-manager-web"
+      }
+    },
+    "serve": {
+      "executor": "@nx/next:server",
+      "options": {
+        "buildTarget": "waste-manager-web:build",
+        "dev": true
+      }
+    },
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "options": {
+        "lintFilePatterns": ["apps/waste-manager-web/**/*.{ts,tsx,js,jsx}"]
+      }
+    }
+  },
+  "tags": []
+}
