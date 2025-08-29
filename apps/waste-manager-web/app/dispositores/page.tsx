@@ -20,7 +20,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Plus, Search, Edit, Trash2, Phone, Mail, AlertCircle, Database } from "lucide-react"
-import { useDisposers, useSeeds } from "@/lib/hooks/use-market-prices"
+import { useDisposers, useSeeds } from "@/hooks/use-market-prices"
 import { Disposer, CreateDisposerDto } from "@/lib/types/market-prices"
 import { toast } from "sonner"
 
