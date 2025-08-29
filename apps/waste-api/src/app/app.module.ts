@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DisposersModule } from './disposers/disposers.module';
+import { MarketPricesModule } from './market-prices/market-prices.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { DisposersModule } from './disposers/disposers.module';
       synchronize: process.env.NODE_ENV !== 'production', // Only in development
     }),
     DisposersModule,
+    MarketPricesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
