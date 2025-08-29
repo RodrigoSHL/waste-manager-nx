@@ -9,35 +9,9 @@ import {
   UpdateWasteDto,
   UpdatePriceDto,
   UpsertPriceResponse,
-  PriceHistory
+  PriceHistory,
+  PriceOverview
 } from '@/lib/types/market-prices';
-
-// Tipo para la vista de overview
-interface PriceOverview {
-  price_id: number;
-  price: number;
-  price_period: string;
-  source?: string;
-  price_created_at: string;
-  disposer_waste_id: number;
-  min_lot?: number;
-  lead_time_days?: number;
-  disposer_notes?: string;
-  disposer_id: number;
-  disposer_legal_name: string;
-  disposer_trade_name?: string;
-  disposer_rut: string;
-  waste_id: number;
-  waste_code: string;
-  waste_name: string;
-  waste_description?: string;
-  hazard_class?: string;
-  uom_code: string;
-  uom_description: string;
-  currency_code: string;
-  currency_symbol: string;
-  currency_decimals: number;
-}
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 

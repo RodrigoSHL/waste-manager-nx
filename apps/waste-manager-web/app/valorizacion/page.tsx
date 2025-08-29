@@ -1,124 +1,175 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { Plus, Edit, History, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { 
+  SidebarInset, 
+  SidebarTrigger 
+} from '@/components/ui/sidebar'
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card'
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table'
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { 
+  Search,
+  Edit,
+  Plus,
+  TrendingUp,
+  History,
+  Loader2
+} from 'lucide-react'
+import { usePricesOverview } from '@/hooks/use-market-prices'
+import type { PriceOverview } from '@/lib/types/market-prices'
 
-interface Precio {
-  id: string
-  tipo: string
-  subcategoria: string
-  precioActual: number
-  precioAnterior: number
-  fechaActualizacion: string
-  tendencia: "subida" | "bajada" | "estable"
+interface PriceFormData {
+  price: number
+  source: string
+  notes: string
 }
 
-const preciosData: Precio[] = [
-  {
-    id: "1",
-    tipo: "Plástico",
-    subcategoria: "PET Transparente",
-    precioActual: 2.5,
-    precioAnterior: 2.3,
-    fechaActualizacion: "2024-01-15",
-    tendencia: "subida",
-  },
-  {
-    id: "2",
-    tipo: "Plástico",
-    subcategoria: "PET Color",
-    precioActual: 2.0,
-    precioAnterior: 2.2,
-    fechaActualizacion: "2024-01-15",
-    tendencia: "bajada",
-  },
-  {
-    id: "3",
-    tipo: "Cartón",
-    subcategoria: "Cartón Corrugado",
-    precioActual: 1.8,
-    precioAnterior: 1.8,
-    fechaActualizacion: "2024-01-10",
-    tendencia: "estable",
-  },
-  {
-    id: "4",
-    tipo: "Metal",
-    subcategoria: "Aluminio",
-    precioActual: 5.0,
-    precioAnterior: 4.8,
-    fechaActualizacion: "2024-01-12",
-    tendencia: "subida",
-  },
-  {
-    id: "5",
-    tipo: "Metal",
-    subcategoria: "Acero",
-    precioActual: 3.2,
-    precioAnterior: 3.5,
-    fechaActualizacion: "2024-01-14",
-    tendencia: "bajada",
-  },
-]
-
 export default function ValorizacionPage() {
-  const [precios, setPrecios] = useState<Precio[]>(preciosData)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false)
-  const [editingPrecio, setEditingPrecio] = useState<Precio | null>(null)
+  const { overview, isLoading, error, refetch, updatePrice } = usePricesOverview()
+  
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<PriceOverview | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const [priceForm, setPriceForm] = useState<PriceFormData>({
+    price: 0,
+    source: '',
+    notes: '',
+  })
 
-  const getTendenciaIcon = (tendencia: string) => {
-    switch (tendencia) {
-      case "subida":
-        return <TrendingUp className="h-4 w-4 text-green-600 icon-hover" />
-      case "bajada":
-        return <TrendingDown className="h-4 w-4 text-red-600 icon-hover" />
-      default:
-        return <Minus className="h-4 w-4 text-gray-600 icon-hover" />
+  const resetForm = () => {
+    setPriceForm({
+      price: 0,
+      source: '',
+      notes: '',
+    })
+  }
+
+  const handleUpdatePrice = (item: PriceOverview) => {
+    setSelectedItem(item)
+    setPriceForm({
+      price: item.price,
+      source: item.source || '',
+      notes: '',
+    })
+    setIsUpdateDialogOpen(true)
+  }
+
+  const handleSubmitUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedItem) return
+
+    if (priceForm.price <= 0) {
+      toast.error('El precio debe ser mayor a 0')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      await updatePrice(selectedItem.disposer_id, selectedItem.waste_id, {
+        price: priceForm.price,
+        source: priceForm.source || undefined,
+        notes: priceForm.notes || undefined,
+      })
+      toast.success('Precio actualizado exitosamente')
+      setIsUpdateDialogOpen(false)
+      setSelectedItem(null)
+      resetForm()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error actualizando precio')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const getTendenciaBadge = (tendencia: string) => {
-    const variants = {
-      subida: "default",
-      bajada: "destructive",
-      estable: "secondary",
-    } as const
+  // Filtrar precios por término de búsqueda
+  const filteredOverview = overview.filter((item: PriceOverview) =>
+    item.waste_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.waste_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.disposer_legal_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.disposer_trade_name && item.disposer_trade_name.toLowerCase().includes(searchTerm.toLowerCase()))
+  )
 
-    return <Badge variant={variants[tendencia as keyof typeof variants]}>{tendencia}</Badge>
+  // Calcular estadísticas
+  const totalRelations = overview.length
+  const avgPrice = overview.length > 0 ? overview.reduce((sum: number, item: PriceOverview) => sum + item.price, 0) / overview.length : 0
+  const uniqueWastes = new Set(overview.map((item: PriceOverview) => item.waste_id)).size
+  const uniqueDisposers = new Set(overview.map((item: PriceOverview) => item.disposer_id)).size
+
+  // Determinar si un precio está actualizado (menos de 30 días)
+  const isPriceRecent = (dateString: string) => {
+    const priceDate = new Date(dateString)
+    const now = new Date()
+    const diffTime = Math.abs(now.getTime() - priceDate.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays <= 30
   }
 
-  const handleEdit = (precio: Precio) => {
-    setEditingPrecio(precio)
-    setIsDialogOpen(true)
+  const getPriceStatusBadge = (dateString: string) => {
+    const isRecent = isPriceRecent(dateString)
+    return (
+      <Badge variant={isRecent ? "default" : "destructive"}>
+        {isRecent ? "Actualizado" : "Desactualizado"}
+      </Badge>
+    )
   }
 
-  const handleMassiveUpdate = () => {
-    // Lógica para actualización masiva
-    console.log("Actualización masiva de precios")
+  if (error) {
+    return (
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <h1 className="text-lg font-semibold">Gestión de Valorización</h1>
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <Card>
+            <CardContent className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <p className="text-destructive mb-4">Error cargando datos: {error}</p>
+                <Button onClick={refetch}>Reintentar</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </SidebarInset>
+    )
   }
 
   return (
     <SidebarInset>
-      <header className="page-header flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+      <header className="flex h-16 shrink-0 items-center gap-2">
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
@@ -127,180 +178,265 @@ export default function ValorizacionPage() {
       </header>
 
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        {/* Resumen de precios */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="metric-card">
+        {/* Estadísticas de Resumen */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Relaciones Activas</CardTitle>
+              <Plus className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalRelations}</div>
+              <p className="text-xs text-muted-foreground">
+                {uniqueDisposers} dispositores × {uniqueWastes} residuos
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Precio Promedio</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground icon-hover" />
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$2.90</div>
-              <p className="text-xs text-muted-foreground">+5.2% desde la última actualización</p>
+              <div className="text-2xl font-bold">${avgPrice.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">por unidad de medida</p>
             </CardContent>
           </Card>
 
-          <Card className="metric-card">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Categorías Activas</CardTitle>
-              <Plus className="h-4 w-4 text-muted-foreground icon-hover" />
+              <CardTitle className="text-sm font-medium">Precios Actualizados</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground">3 tipos principales</p>
+              <div className="text-2xl font-bold">
+                {overview.filter((item: PriceOverview) => isPriceRecent(item.price_created_at)).length}
+              </div>
+              <p className="text-xs text-muted-foreground">últimos 30 días</p>
             </CardContent>
           </Card>
 
-          <Card className="metric-card">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Última Actualización</CardTitle>
-              <History className="h-4 w-4 text-muted-foreground icon-hover" />
+              <CardTitle className="text-sm font-medium">Dispositores Únicos</CardTitle>
+              <History className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Hoy</div>
-              <p className="text-xs text-muted-foreground">15 de Enero, 2024</p>
+              <div className="text-2xl font-bold">{uniqueDisposers}</div>
+              <p className="text-xs text-muted-foreground">activos en el sistema</p>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="card">
+        {/* Tabla de Valorización */}
+        <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Precios por Categoría</CardTitle>
+                <CardTitle>Matriz de Valorización</CardTitle>
                 <CardDescription>
-                  Gestiona los precios de valorización por tipo y subcategoría de residuo
+                  Precios actuales de residuos por dispositor
                 </CardDescription>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" className="btn-secondary bg-transparent" onClick={handleMassiveUpdate}>
-                  Actualización Masiva
-                </Button>
-                <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <History className="mr-2 h-4 w-4 icon-hover" />
-                      Historial
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[600px]">
-                    <DialogHeader>
-                      <DialogTitle>Historial de Precios</DialogTitle>
-                      <DialogDescription>Consulta el historial de cambios de precios por período</DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                      <p className="text-sm text-muted-foreground">Funcionalidad de historial en desarrollo...</p>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="btn-primary" onClick={() => setEditingPrecio(null)}>
-                      <Plus className="mr-2 h-4 w-4 icon-hover" />
-                      Nuevo Precio
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="dialog-enhanced sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>{editingPrecio ? "Editar Precio" : "Nuevo Precio"}</DialogTitle>
-                      <DialogDescription>
-                        {editingPrecio
-                          ? "Modifica el precio de valorización"
-                          : "Ingresa un nuevo precio de valorización"}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="tipo" className="text-right">
-                          Tipo
-                        </Label>
-                        <Select>
-                          <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Seleccionar tipo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="plastico">Plástico</SelectItem>
-                            <SelectItem value="carton">Cartón</SelectItem>
-                            <SelectItem value="metal">Metal</SelectItem>
-                            <SelectItem value="organico">Orgánico</SelectItem>
-                            <SelectItem value="vidrio">Vidrio</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="subcategoria" className="text-right">
-                          Subcategoría
-                        </Label>
-                        <Input id="subcategoria" placeholder="Ej: PET Transparente" className="col-span-3" />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="precio" className="text-right">
-                          Precio ($/kg)
-                        </Label>
-                        <Input id="precio" type="number" step="0.01" placeholder="0.00" className="col-span-3" />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit">{editingPrecio ? "Actualizar" : "Crear"}</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
+              <Button onClick={refetch} variant="outline">
+                <History className="mr-2 h-4 w-4" />
+                Actualizar Datos
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {/* Tabla de precios */}
-            <div className="rounded-md border">
+            <div className="mb-4 flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por residuo, código o dispositor..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Cargando datos de valorización...</span>
+              </div>
+            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Subcategoría</TableHead>
+                    <TableHead>Residuo</TableHead>
+                    <TableHead>Dispositor</TableHead>
                     <TableHead>Precio Actual</TableHead>
-                    <TableHead>Precio Anterior</TableHead>
-                    <TableHead>Cambio</TableHead>
-                    <TableHead>Tendencia</TableHead>
+                    <TableHead>UoM</TableHead>
+                    <TableHead>Lote Mínimo</TableHead>
+                    <TableHead>Lead Time</TableHead>
+                    <TableHead>Estado</TableHead>
                     <TableHead>Última Actualización</TableHead>
-                    <TableHead>Acciones</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {precios.map((precio) => (
-                    <TableRow key={precio.id} className="table-row">
-                      <TableCell className="font-medium">{precio.tipo}</TableCell>
-                      <TableCell>{precio.subcategoria}</TableCell>
-                      <TableCell className="font-bold">${precio.precioActual.toFixed(2)}</TableCell>
-                      <TableCell className="text-muted-foreground">${precio.precioAnterior.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {getTendenciaIcon(precio.tendencia)}
-                          <span
-                            className={`text-sm ${
-                              precio.tendencia === "subida"
-                                ? "text-green-600"
-                                : precio.tendencia === "bajada"
-                                  ? "text-red-600"
-                                  : "text-gray-600"
-                            }`}
-                          >
-                            ${Math.abs(precio.precioActual - precio.precioAnterior).toFixed(2)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getTendenciaBadge(precio.tendencia)}</TableCell>
-                      <TableCell>{precio.fechaActualizacion}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(precio)}>
-                          <Edit className="h-4 w-4 icon-hover" />
-                        </Button>
+                  {filteredOverview.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8">
+                        {searchTerm ? 'No se encontraron resultados que coincidan con la búsqueda' : 'No hay relaciones activas entre dispositores y residuos'}
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    filteredOverview.map((item: PriceOverview) => (
+                      <TableRow key={`${item.disposer_id}-${item.waste_id}`}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{item.waste_name}</div>
+                            <div className="text-sm text-muted-foreground">{item.waste_code}</div>
+                            {item.hazard_class && (
+                              <Badge variant="outline" className="mt-1 text-xs">
+                                Clase {item.hazard_class}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{item.disposer_legal_name}</div>
+                            {item.disposer_trade_name && (
+                              <div className="text-sm text-muted-foreground">{item.disposer_trade_name}</div>
+                            )}
+                            <div className="text-xs text-muted-foreground">{item.disposer_rut}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-bold text-lg">
+                            {item.currency_symbol}{typeof item.price === 'number' ? item.price.toFixed(item.currency_decimals) : '0.00'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{item.uom_code}</div>
+                            <div className="text-sm text-muted-foreground">{item.uom_description}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {item.min_lot ? `${item.min_lot} ${item.uom_code}` : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {item.lead_time_days ? `${item.lead_time_days} días` : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {getPriceStatusBadge(item.price_created_at)}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div>{new Date(item.price_created_at).toLocaleDateString()}</div>
+                            {item.source && (
+                              <div className="text-xs text-muted-foreground">Fuente: {item.source}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdatePrice(item)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
-            </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Dialog para Actualizar Precio */}
+        <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Actualizar Precio</DialogTitle>
+              <DialogDescription>
+                {selectedItem && (
+                  <>
+                    Actualizar precio para <strong>{selectedItem.waste_name}</strong> del dispositor{' '}
+                    <strong>{selectedItem.disposer_legal_name}</strong>
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitUpdate}>
+              <div className="grid gap-4 py-4">
+                {selectedItem && (
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label className="text-right">Precio Actual</Label>
+                    <div className="col-span-3 p-3 bg-muted rounded">
+                      <span className="text-lg font-bold">
+                        {selectedItem.currency_symbol}{typeof selectedItem.price === 'number' ? selectedItem.price.toFixed(selectedItem.currency_decimals) : '0.00'} / {selectedItem.uom_code}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="price" className="text-right">
+                    Nuevo Precio *
+                  </Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={priceForm.price}
+                    onChange={(e) => setPriceForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                    className="col-span-3"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="source" className="text-right">
+                    Fuente
+                  </Label>
+                  <Input
+                    id="source"
+                    value={priceForm.source}
+                    onChange={(e) => setPriceForm(prev => ({ ...prev, source: e.target.value }))}
+                    className="col-span-3"
+                    placeholder="ej: Cotización, Mercado, etc."
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="notes" className="text-right">
+                    Notas
+                  </Label>
+                  <Textarea
+                    id="notes"
+                    value={priceForm.notes}
+                    onChange={(e) => setPriceForm(prev => ({ ...prev, notes: e.target.value }))}
+                    className="col-span-3"
+                    placeholder="Comentarios adicionales sobre la actualización..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsUpdateDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Actualizar Precio
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </SidebarInset>
   )
