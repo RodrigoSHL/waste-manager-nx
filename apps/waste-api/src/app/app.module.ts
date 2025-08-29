@@ -18,7 +18,7 @@ import { MarketPricesModule } from './market-prices/market-prices.module';
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'waste_manager',
       autoLoadEntities: true,
-      synchronize: process.env.NODE_ENV !== 'production', // Only in development
+      synchronize: false, // Deshabilitado - usamos migraciones SQL manuales
     }),
     MarketPricesModule,
   ],
