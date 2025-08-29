@@ -5,6 +5,7 @@ import "./globals.css"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -27,6 +28,7 @@ export default function RootLayout({
           <main className="flex-1">{children}</main>
         </SidebarProvider>
         <Toaster />
+        <SonnerToaster position="top-right" richColors />
       </body>
     </html>
   )
