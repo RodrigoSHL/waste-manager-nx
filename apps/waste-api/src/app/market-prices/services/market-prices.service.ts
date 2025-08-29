@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { MarketPricesRepository } from '../repositories/market-prices.repository';
+import { CreateWasteDto, UpdateWasteDto } from '../dto/waste.dto';
 
 @Injectable()
 export class MarketPricesService {
@@ -173,5 +174,84 @@ export class MarketPricesService {
       avgPrice: Math.round(avgPrice * 100) / 100, // Redondear a 2 decimales
       prices: comparison,
     };
+  }
+
+  /**
+   * Crea un nuevo residuo
+   */
+  async createWaste(createWasteDto: CreateWasteDto) {
+    // Verificar que no exista un residuo con el mismo código
+    const existingByCode = await this.marketPricesRepository.findWasteByCode(createWasteDto.code);
+    if (existingByCode) {
+      throw new BadRequestException(`Ya existe un residuo con el código '${createWasteDto.code}'`);
+    }
+
+    // Verificar que no exista un residuo con el mismo nombre
+    const existingByName = await this.marketPricesRepository.findWasteByName(createWasteDto.name);
+    if (existingByName) {
+      throw new BadRequestException(`Ya existe un residuo con el nombre '${createWasteDto.name}'`);
+    }
+
+    return this.marketPricesRepository.createWaste(createWasteDto);
+  }
+
+  /**
+   * Actualiza un residuo existente
+   */
+  async updateWaste(wasteId: number, updateWasteDto: UpdateWasteDto) {
+    const waste = await this.marketPricesRepository.findWasteById(wasteId);
+    if (!waste) {
+      throw new NotFoundException(`Residuo con ID ${wasteId} no encontrado`);
+    }
+
+    // Si se actualiza el código, verificar que no exista otro residuo con el mismo código
+    if (updateWasteDto.code && updateWasteDto.code !== waste.code) {
+      const existingByCode = await this.marketPricesRepository.findWasteByCode(updateWasteDto.code);
+      if (existingByCode) {
+        throw new BadRequestException(`Ya existe un residuo con el código '${updateWasteDto.code}'`);
+      }
+    }
+
+    // Si se actualiza el nombre, verificar que no exista otro residuo con el mismo nombre
+    if (updateWasteDto.name && updateWasteDto.name !== waste.name) {
+      const existingByName = await this.marketPricesRepository.findWasteByName(updateWasteDto.name);
+      if (existingByName) {
+        throw new BadRequestException(`Ya existe un residuo con el nombre '${updateWasteDto.name}'`);
+      }
+    }
+
+    return this.marketPricesRepository.updateWaste(wasteId, updateWasteDto);
+  }
+
+  /**
+   * Elimina un residuo
+   */
+  async deleteWaste(wasteId: number) {
+    const waste = await this.marketPricesRepository.findWasteById(wasteId);
+    if (!waste) {
+      throw new NotFoundException(`Residuo con ID ${wasteId} no encontrado`);
+    }
+
+    // Verificar que no tenga relaciones con dispositores activas
+    const hasActiveRelations = await this.marketPricesRepository.hasActiveWasteRelations(wasteId);
+    if (hasActiveRelations) {
+      throw new BadRequestException(
+        'No se puede eliminar el residuo porque tiene relaciones activas con dispositores'
+      );
+    }
+
+    await this.marketPricesRepository.deleteWaste(wasteId);
+    return { message: 'Residuo eliminado exitosamente' };
+  }
+
+  /**
+   * Obtiene un residuo por ID
+   */
+  async getWasteById(wasteId: number) {
+    const waste = await this.marketPricesRepository.findWasteById(wasteId);
+    if (!waste) {
+      throw new NotFoundException(`Residuo con ID ${wasteId} no encontrado`);
+    }
+    return waste;
   }
 }

@@ -5,6 +5,7 @@ import { Disposer } from '../entities/disposer.entity';
 import { Waste } from '../entities/waste.entity';
 import { DisposerWaste } from '../entities/disposer-waste.entity';
 import { PriceHistory } from '../entities/price-history.entity';
+import { CreateWasteDto, UpdateWasteDto } from '../dto/waste.dto';
 
 @Injectable()
 export class MarketPricesRepository {
@@ -228,5 +229,68 @@ export class MarketPricesRepository {
         AND ph.price_period @> now()
       ORDER BY w.name, d.legal_name
     `);
+  }
+
+  // ===== MÉTODOS CRUD PARA WASTES =====
+
+  /**
+   * Busca un residuo por código
+   */
+  async findWasteByCode(code: string): Promise<Waste | null> {
+    return this.wasteRepository.findOne({ where: { code } });
+  }
+
+  /**
+   * Busca un residuo por nombre
+   */
+  async findWasteByName(name: string): Promise<Waste | null> {
+    return this.wasteRepository.findOne({ where: { name } });
+  }
+
+  /**
+   * Busca un residuo por ID
+   */
+  async findWasteById(id: number): Promise<Waste | null> {
+    return this.wasteRepository.findOne({ where: { id } });
+  }
+
+  /**
+   * Crea un nuevo residuo
+   */
+  async createWaste(createWasteDto: CreateWasteDto): Promise<Waste> {
+    const waste = this.wasteRepository.create(createWasteDto);
+    return this.wasteRepository.save(waste);
+  }
+
+  /**
+   * Actualiza un residuo existente
+   */
+  async updateWaste(id: number, updateWasteDto: UpdateWasteDto): Promise<Waste> {
+    await this.wasteRepository.update(id, updateWasteDto);
+    const updatedWaste = await this.wasteRepository.findOne({ where: { id } });
+    if (!updatedWaste) {
+      throw new Error('Residuo no encontrado después de la actualización');
+    }
+    return updatedWaste;
+  }
+
+  /**
+   * Elimina un residuo
+   */
+  async deleteWaste(id: number): Promise<void> {
+    await this.wasteRepository.delete(id);
+  }
+
+  /**
+   * Verifica si un residuo tiene relaciones activas con dispositores
+   */
+  async hasActiveWasteRelations(wasteId: number): Promise<boolean> {
+    const count = await this.disposerWasteRepository.count({
+      where: {
+        waste_id: wasteId,
+        is_active: true,
+      },
+    });
+    return count > 0;
   }
 }

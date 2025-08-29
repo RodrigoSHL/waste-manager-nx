@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
   Param,
   ParseIntPipe,
@@ -10,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { MarketPricesService } from './services/market-prices.service';
 import { SeedMarketPrices } from './seed/seed-market-prices';
+import { CreateWasteDto, UpdateWasteDto } from './dto/waste.dto';
 
 @Controller('market-prices')
 export class MarketPricesController {
@@ -134,6 +137,66 @@ export class MarketPricesController {
         `Error ejecutando seeds: ${message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
+    }
+  }
+
+  // ===== ENDPOINTS CRUD PARA WASTES =====
+
+  /**
+   * Crea un nuevo residuo
+   */
+  @Post('wastes')
+  async createWaste(@Body() createWasteDto: CreateWasteDto) {
+    try {
+      return await this.marketPricesService.createWaste(createWasteDto);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      const status = error instanceof HttpException ? error.getStatus() : HttpStatus.BAD_REQUEST;
+      throw new HttpException(message, status);
+    }
+  }
+
+  /**
+   * Obtiene un residuo por ID
+   */
+  @Get('wastes/:id')
+  async getWasteById(@Param('id', ParseIntPipe) wasteId: number) {
+    try {
+      return await this.marketPricesService.getWasteById(wasteId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      throw new HttpException(message, HttpStatus.NOT_FOUND);
+    }
+  }
+
+  /**
+   * Actualiza un residuo existente
+   */
+  @Put('wastes/:id')
+  async updateWaste(
+    @Param('id', ParseIntPipe) wasteId: number,
+    @Body() updateWasteDto: UpdateWasteDto,
+  ) {
+    try {
+      return await this.marketPricesService.updateWaste(wasteId, updateWasteDto);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      const status = error instanceof HttpException ? error.getStatus() : HttpStatus.BAD_REQUEST;
+      throw new HttpException(message, status);
+    }
+  }
+
+  /**
+   * Elimina un residuo
+   */
+  @Delete('wastes/:id')
+  async deleteWaste(@Param('id', ParseIntPipe) wasteId: number) {
+    try {
+      return await this.marketPricesService.deleteWaste(wasteId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      const status = error instanceof HttpException ? error.getStatus() : HttpStatus.BAD_REQUEST;
+      throw new HttpException(message, status);
     }
   }
 }

@@ -6,7 +6,6 @@ import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Dialog,
@@ -17,267 +16,442 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { Plus, Search, Edit, Trash2, Filter, Download } from "lucide-react"
-
-interface Residuo {
-  id: string
-  tipo: string
-  nombre: string
-  cantidad: number
-  dispositor: string
-  precioVenta: number
-  precioRecepcion: number
-  margen: number
-  fecha: string
-  estado: "procesado" | "pendiente" | "enviado"
-}
-
-const residuosData: Residuo[] = [
-  {
-    id: "1",
-    tipo: "Plástico",
-    nombre: "PET Transparente",
-    cantidad: 150,
-    dispositor: "EcoRecicla S.A.",
-    precioVenta: 2.5,
-    precioRecepcion: 1.2,
-    margen: 195,
-    fecha: "2024-01-15",
-    estado: "procesado",
-  },
-  {
-    id: "2",
-    tipo: "Cartón",
-    nombre: "Cartón Corrugado",
-    cantidad: 200,
-    dispositor: "Verde Limpio",
-    precioVenta: 1.8,
-    precioRecepcion: 0.8,
-    margen: 200,
-    fecha: "2024-01-14",
-    estado: "enviado",
-  },
-  {
-    id: "3",
-    tipo: "Metal",
-    nombre: "Aluminio",
-    cantidad: 80,
-    dispositor: "Residuos Pro",
-    precioVenta: 5.0,
-    precioRecepcion: 2.0,
-    margen: 240,
-    fecha: "2024-01-13",
-    estado: "pendiente",
-  },
-]
+import { Textarea } from "@/components/ui/textarea"
+import { Plus, Search, Edit, Trash2, Loader2 } from "lucide-react"
+import { useWastes } from "@/hooks/use-market-prices"
+import { CreateWasteDto, UpdateWasteDto, Waste } from "@/lib/types/market-prices"
+import { toast } from "sonner"
 
 export default function ResiduosPage() {
-  const [residuos, setResiduos] = useState<Residuo[]>(residuosData)
+  const { wastes, isLoading, error, refetch, createWaste, updateWaste, deleteWaste } = useWastes()
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterTipo, setFilterTipo] = useState("todos")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingResiduo, setEditingResiduo] = useState<Residuo | null>(null)
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingWaste, setEditingWaste] = useState<Waste | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const filteredResiduos = residuos.filter((residuo) => {
-    const matchesSearch =
-      residuo.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      residuo.dispositor.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter = filterTipo === "todos" || residuo.tipo === filterTipo
-    return matchesSearch && matchesFilter
+  // Formulario para crear/editar
+  const [formData, setFormData] = useState<CreateWasteDto>({
+    code: '',
+    name: '',
+    description: '',
+    hazard_class: '',
   })
 
-  const getEstadoBadge = (estado: string) => {
-    const variants = {
-      procesado: "default",
-      pendiente: "secondary",
-      enviado: "outline",
-    } as const
-
-    return <Badge variant={variants[estado as keyof typeof variants]}>{estado}</Badge>
+  const resetForm = () => {
+    setFormData({
+      code: '',
+      name: '',
+      description: '',
+      hazard_class: '',
+    })
   }
 
-  const handleEdit = (residuo: Residuo) => {
-    setEditingResiduo(residuo)
-    setIsDialogOpen(true)
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.code.trim() || !formData.name.trim()) {
+      toast.error('El código y nombre son obligatorios')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      await createWaste({
+        code: formData.code.trim(),
+        name: formData.name.trim(),
+        description: formData.description?.trim() || undefined,
+        hazard_class: formData.hazard_class?.trim() || undefined,
+      })
+      toast.success('Residuo creado exitosamente')
+      setIsCreateDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error creando residuo')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setResiduos(residuos.filter((r) => r.id !== id))
+  const handleEdit = (waste: Waste) => {
+    setEditingWaste(waste)
+    setFormData({
+      code: waste.code,
+      name: waste.name,
+      description: waste.description || '',
+      hazard_class: waste.hazard_class || '',
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingWaste) return
+
+    setIsSubmitting(true)
+    try {
+      const updateData: UpdateWasteDto = {}
+      
+      if (formData.code.trim() !== editingWaste.code) {
+        updateData.code = formData.code.trim()
+      }
+      if (formData.name.trim() !== editingWaste.name) {
+        updateData.name = formData.name.trim()
+      }
+      if (formData.description?.trim() !== (editingWaste.description || '')) {
+        updateData.description = formData.description?.trim() || undefined
+      }
+      if (formData.hazard_class?.trim() !== (editingWaste.hazard_class || '')) {
+        updateData.hazard_class = formData.hazard_class?.trim() || undefined
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        toast.info('No hay cambios para guardar')
+        setIsEditDialogOpen(false)
+        return
+      }
+
+      await updateWaste(editingWaste.id, updateData)
+      toast.success('Residuo actualizado exitosamente')
+      setIsEditDialogOpen(false)
+      setEditingWaste(null)
+      resetForm()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error actualizando residuo')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (waste: Waste) => {
+    if (!confirm(`¿Está seguro de que desea eliminar el residuo "${waste.name}"?`)) {
+      return
+    }
+
+    try {
+      await deleteWaste(waste.id)
+      toast.success('Residuo eliminado exitosamente')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error eliminando residuo')
+    }
+  }
+
+  // Filtrar residuos por término de búsqueda
+  const filteredWastes = wastes.filter(waste =>
+    waste.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    waste.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (waste.description && waste.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  )
+
+  if (error) {
+    return (
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <h1 className="text-lg font-semibold">Gestión de Residuos</h1>
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <Card>
+            <CardContent className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <p className="text-destructive mb-4">Error cargando residuos: {error}</p>
+                <Button onClick={refetch}>Reintentar</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </SidebarInset>
+    )
   }
 
   return (
     <SidebarInset>
-      <header className="page-header flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+      <header className="flex h-16 shrink-0 items-center gap-2">
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <h1 className="text-lg font-semibold">Gestión de Residuos</h1>
         </div>
       </header>
-
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <Card className="card">
+        {/* Estadísticas */}
+        <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Total Residuos</CardDescription>
+              <CardTitle className="text-4xl">{wastes.length}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Con Clasificación de Peligro</CardDescription>
+              <CardTitle className="text-4xl">
+                {wastes.filter(w => w.hazard_class).length}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Con Descripción</CardDescription>
+              <CardTitle className="text-4xl">
+                {wastes.filter(w => w.description).length}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* Controles y Lista */}
+        <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Registro de Residuos</CardTitle>
-                <CardDescription>Gestiona todos los residuos procesados por la empresa</CardDescription>
+                <CardTitle>Lista de Residuos</CardTitle>
+                <CardDescription>
+                  Gestiona los tipos de residuos del sistema
+                </CardDescription>
               </div>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="btn-primary" onClick={() => setEditingResiduo(null)}>
+                  <Button onClick={resetForm}>
                     <Plus className="mr-2 h-4 w-4" />
                     Nuevo Residuo
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="dialog-enhanced sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[500px]">
                   <DialogHeader>
-                    <DialogTitle>{editingResiduo ? "Editar Residuo" : "Nuevo Residuo"}</DialogTitle>
+                    <DialogTitle>Crear Nuevo Residuo</DialogTitle>
                     <DialogDescription>
-                      {editingResiduo ? "Modifica los datos del residuo" : "Ingresa los datos del nuevo residuo"}
+                      Ingresa los datos del nuevo tipo de residuo
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="tipo" className="text-right">
-                        Tipo
-                      </Label>
-                      <Select>
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Seleccionar tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="plastico">Plástico</SelectItem>
-                          <SelectItem value="carton">Cartón</SelectItem>
-                          <SelectItem value="metal">Metal</SelectItem>
-                          <SelectItem value="organico">Orgánico</SelectItem>
-                          <SelectItem value="vidrio">Vidrio</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  <form onSubmit={handleCreate}>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="code" className="text-right">
+                          Código *
+                        </Label>
+                        <Input
+                          id="code"
+                          value={formData.code}
+                          onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                          className="col-span-3"
+                          placeholder="ej: PET-01"
+                          required
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="name" className="text-right">
+                          Nombre *
+                        </Label>
+                        <Input
+                          id="name"
+                          value={formData.name}
+                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                          className="col-span-3"
+                          placeholder="ej: PET Transparente"
+                          required
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="description" className="text-right">
+                          Descripción
+                        </Label>
+                        <Textarea
+                          id="description"
+                          value={formData.description}
+                          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                          className="col-span-3"
+                          placeholder="Descripción detallada del residuo"
+                          rows={3}
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="hazard_class" className="text-right">
+                          Clase Peligro
+                        </Label>
+                        <Input
+                          id="hazard_class"
+                          value={formData.hazard_class}
+                          onChange={(e) => setFormData(prev => ({ ...prev, hazard_class: e.target.value }))}
+                          className="col-span-3"
+                          placeholder="ej: 3, 4.1, etc."
+                        />
+                      </div>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="nombre" className="text-right">
-                        Nombre
-                      </Label>
-                      <Input id="nombre" placeholder="Ej: PET Transparente" className="col-span-3" />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="cantidad" className="text-right">
-                        Cantidad (kg)
-                      </Label>
-                      <Input id="cantidad" type="number" placeholder="0" className="col-span-3" />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="dispositor" className="text-right">
-                        Dispositor
-                      </Label>
-                      <Select>
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Seleccionar dispositor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ecorecicla">EcoRecicla S.A.</SelectItem>
-                          <SelectItem value="verde">Verde Limpio</SelectItem>
-                          <SelectItem value="residuos">Residuos Pro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="precio-venta" className="text-right">
-                        Precio Venta
-                      </Label>
-                      <Input id="precio-venta" type="number" step="0.01" placeholder="0.00" className="col-span-3" />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit">{editingResiduo ? "Actualizar" : "Crear"}</Button>
-                  </DialogFooter>
+                    <DialogFooter>
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Crear Residuo
+                      </Button>
+                    </DialogFooter>
+                  </form>
                 </DialogContent>
               </Dialog>
             </div>
           </CardHeader>
           <CardContent>
-            {/* Filtros y búsqueda */}
-            <div className="flex items-center gap-4 mb-6">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por nombre o dispositor..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="input-enhanced pl-8"
-                  />
-                </div>
+            <div className="mb-4 flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por código, nombre o descripción..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
               </div>
-              <Select value={filterTipo} onValueChange={setFilterTipo}>
-                <SelectTrigger className="w-[180px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos los tipos</SelectItem>
-                  <SelectItem value="Plástico">Plástico</SelectItem>
-                  <SelectItem value="Cartón">Cartón</SelectItem>
-                  <SelectItem value="Metal">Metal</SelectItem>
-                  <SelectItem value="Orgánico">Orgánico</SelectItem>
-                  <SelectItem value="Vidrio">Vidrio</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline">
-                <Download className="mr-2 h-4 w-4" />
-                Exportar
-              </Button>
             </div>
 
-            {/* Tabla de residuos */}
-            <div className="rounded-md border">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Cargando residuos...</span>
+              </div>
+            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tipo</TableHead>
+                    <TableHead>Código</TableHead>
                     <TableHead>Nombre</TableHead>
-                    <TableHead>Cantidad (kg)</TableHead>
-                    <TableHead>Dispositor</TableHead>
-                    <TableHead>P. Venta</TableHead>
-                    <TableHead>P. Recepción</TableHead>
-                    <TableHead>Margen</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Acciones</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead>Clase Peligro</TableHead>
+                    <TableHead>Fecha Creación</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredResiduos.map((residuo) => (
-                    <TableRow key={residuo.id} className="table-row">
-                      <TableCell className="font-medium">{residuo.tipo}</TableCell>
-                      <TableCell>{residuo.nombre}</TableCell>
-                      <TableCell>{residuo.cantidad}</TableCell>
-                      <TableCell>{residuo.dispositor}</TableCell>
-                      <TableCell>${residuo.precioVenta}</TableCell>
-                      <TableCell>${residuo.precioRecepcion}</TableCell>
-                      <TableCell className="font-medium text-green-600">${residuo.margen}</TableCell>
-                      <TableCell>{residuo.fecha}</TableCell>
-                      <TableCell>{getEstadoBadge(residuo.estado)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(residuo)}>
-                            <Edit className="h-4 w-4 icon-hover" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(residuo.id)}>
-                            <Trash2 className="h-4 w-4 icon-hover" />
-                          </Button>
-                        </div>
+                  {filteredWastes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        {searchTerm ? 'No se encontraron residuos que coincidan con la búsqueda' : 'No hay residuos registrados'}
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    filteredWastes.map((waste) => (
+                      <TableRow key={waste.id}>
+                        <TableCell className="font-medium">{waste.code}</TableCell>
+                        <TableCell>{waste.name}</TableCell>
+                        <TableCell>
+                          {waste.description ? (
+                            <span className="text-sm text-muted-foreground">
+                              {waste.description.length > 50 
+                                ? `${waste.description.substring(0, 50)}...` 
+                                : waste.description}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground italic">Sin descripción</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {waste.hazard_class ? (
+                            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
+                              {waste.hazard_class}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(waste.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(waste)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(waste)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
-            </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Dialog de Edición */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Editar Residuo</DialogTitle>
+              <DialogDescription>
+                Modifica los datos del residuo
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleUpdate}>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-code" className="text-right">
+                    Código *
+                  </Label>
+                  <Input
+                    id="edit-code"
+                    value={formData.code}
+                    onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                    className="col-span-3"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-name" className="text-right">
+                    Nombre *
+                  </Label>
+                  <Input
+                    id="edit-name"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="col-span-3"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-description" className="text-right">
+                    Descripción
+                  </Label>
+                  <Textarea
+                    id="edit-description"
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    className="col-span-3"
+                    rows={3}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-hazard_class" className="text-right">
+                    Clase Peligro
+                  </Label>
+                  <Input
+                    id="edit-hazard_class"
+                    value={formData.hazard_class}
+                    onChange={(e) => setFormData(prev => ({ ...prev, hazard_class: e.target.value }))}
+                    className="col-span-3"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Guardar Cambios
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </SidebarInset>
   )

@@ -5,6 +5,8 @@ import {
   WasteComparison, 
   WasteStats,
   CreateDisposerDto,
+  CreateWasteDto,
+  UpdateWasteDto,
   UpdatePriceDto,
   UpsertPriceResponse,
   PriceHistory
@@ -78,6 +80,30 @@ class MarketPricesService {
   // Wastes
   async getWastes(): Promise<Waste[]> {
     return this.request<Waste[]>('/market-prices/wastes');
+  }
+
+  async createWaste(data: CreateWasteDto): Promise<Waste> {
+    return this.request<Waste>('/market-prices/wastes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getWasteById(wasteId: number): Promise<Waste> {
+    return this.request<Waste>(`/market-prices/wastes/${wasteId}`);
+  }
+
+  async updateWaste(wasteId: number, data: UpdateWasteDto): Promise<Waste> {
+    return this.request<Waste>(`/market-prices/wastes/${wasteId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteWaste(wasteId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/market-prices/wastes/${wasteId}`, {
+      method: 'DELETE',
+    });
   }
 
   async getWasteComparison(wasteId: number): Promise<WasteComparison[]> {

@@ -130,21 +130,36 @@ export interface WasteStats {
   prices: WasteComparison[];
 }
 
-// DTOs para crear/actualizar
+// DTOs para el frontend
 export interface CreateDisposerDto {
   legal_name: string;
   trade_name?: string;
   rut: string;
   website?: string;
-  contacts?: CreateDisposerContactDto[];
+  is_active?: boolean;
+  contacts?: CreateContactDto[];
 }
 
-export interface CreateDisposerContactDto {
+export interface CreateContactDto {
   contact_name: string;
   email: string;
   phone?: string;
   role?: string;
   is_primary?: boolean;
+}
+
+export interface CreateWasteDto {
+  code: string;
+  name: string;
+  description?: string;
+  hazard_class?: string;
+}
+
+export interface UpdateWasteDto {
+  code?: string;
+  name?: string;
+  description?: string;
+  hazard_class?: string;
 }
 
 export interface UpdatePriceDto {
