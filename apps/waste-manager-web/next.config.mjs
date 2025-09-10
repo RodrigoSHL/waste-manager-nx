@@ -2,6 +2,8 @@ import { withNx } from '@nx/next/plugins/with-nx.js'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'export',
+  trailingSlash: true,
   eslint: {
     ignoreDuringBuilds: true,
   },

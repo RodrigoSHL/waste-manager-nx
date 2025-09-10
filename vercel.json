@@ -1,6 +1,13 @@
 {
-  "buildCommand": "npm run vercel-build",
-  "outputDirectory": "dist/apps/waste-manager-web",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist/apps/waste-manager-web/.next"
+      }
+    }
+  ],
   "installCommand": "npm install",
-  "framework": null
+  "buildCommand": "npm run vercel-build"
 }
