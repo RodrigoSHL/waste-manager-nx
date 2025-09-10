@@ -9,7 +9,7 @@
     "start:web": "nx serve waste-manager-web",
     "vercel-build": "npx nx build waste-manager-web --prod",
     "build:api": "nx build waste-api --prod",
-    "start:api": "node dist/apps/waste-api/main.js",
+    "start:api": "node apps/waste-api/dist/main.js",
     "dev:api": "nx serve waste-api"
   },
   "private": true,

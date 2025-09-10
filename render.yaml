@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: waste-manager-api
+    runtime: node
+    buildCommand: npm install && npm run build:api
+    startCommand: npm run start:api
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: .
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DB_HOST
+        fromDatabase:
+          name: waste-manager-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: waste-manager-db
+          property: port
+      - key: DB_USERNAME
+        fromDatabase:
+          name: waste-manager-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: waste-manager-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: waste-manager-db
+          property: database
+
+databases:
+  - name: waste-manager-db
+    databaseName: waste_manager
+    user: postgres
+    plan: free
+    region: oregon
