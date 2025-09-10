@@ -1,0 +1,5 @@
+{
+  "buildCommand": "npx nx build waste-manager-web --prod",
+  "outputDirectory": "dist/apps/waste-manager-web",
+  "installCommand": "npm install"
+}
