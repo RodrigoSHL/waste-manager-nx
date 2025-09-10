@@ -2,7 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { marketPricesService } from '@/lib/services/market-prices';
-import { Disposer, Waste, CreateDisposerDto, CreateWasteDto, UpdateWasteDto, PriceOverview } from '@/lib/types/market-prices';
+import { 
+  Disposer, 
+  Waste, 
+  LatestPrice, 
+  WasteComparison, 
+  WasteStats,
+  CreateDisposerDto,
+  CreateWasteDto,
+  UpdateWasteDto,
+  PriceOverview,
+  PriceHistory
+} from '@/lib/types/market-prices';
 
 // Hook para dispositores
 export function useDisposers() {
@@ -233,5 +244,57 @@ export function usePricesOverview() {
     error,
     refetch: fetchOverview,
     updatePrice,
+  };
+}
+
+// Hook para historial de precios
+export function usePriceHistory() {
+  const [history, setHistory] = useState<PriceHistory[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchHistory = async (disposerId: number, wasteId: number) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const rawData = await marketPricesService.getTimeSeries(disposerId, wasteId);
+      
+      // Debug: Log para ver qué datos vienen del backend
+      console.log('📊 Raw history data from backend:', rawData);
+      
+      // Transformar los datos del backend
+      const transformedData: PriceHistory[] = rawData.map(item => {
+        const transformedPrice = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
+        console.log(`💰 Transforming price: "${item.price}" (${typeof item.price}) -> ${transformedPrice} (${typeof transformedPrice})`);
+        
+        return {
+          ...item,
+          price: transformedPrice
+        };
+      });
+      
+      console.log('✅ Transformed history data:', transformedData);
+      setHistory(transformedData);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error cargando historial';
+      console.error('❌ Error fetching history:', err);
+      setError(errorMessage);
+      setHistory([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    setError(null);
+  };
+
+  return {
+    history,
+    isLoading,
+    error,
+    fetchHistory,
+    clearHistory,
   };
 }

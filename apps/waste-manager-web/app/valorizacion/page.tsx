@@ -41,9 +41,10 @@ import {
   Plus,
   TrendingUp,
   History,
-  Loader2
+  Loader2,
+  TrendingDown
 } from 'lucide-react'
-import { usePricesOverview } from '@/hooks/use-market-prices'
+import { usePricesOverview, usePriceHistory } from '@/hooks/use-market-prices'
 import type { PriceOverview } from '@/lib/types/market-prices'
 
 interface PriceFormData {
@@ -54,9 +55,11 @@ interface PriceFormData {
 
 export default function ValorizacionPage() {
   const { overview, isLoading, error, refetch, updatePrice } = usePricesOverview()
+  const { history, isLoading: isLoadingHistory, error: historyError, fetchHistory, clearHistory } = usePriceHistory()
   
   const [searchTerm, setSearchTerm] = useState('')
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false)
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<PriceOverview | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   
@@ -82,6 +85,22 @@ export default function ValorizacionPage() {
       notes: '',
     })
     setIsUpdateDialogOpen(true)
+  }
+
+  const handleViewHistory = async (item: PriceOverview) => {
+    setSelectedItem(item)
+    setIsHistoryDialogOpen(true)
+    
+    // Debug: Log para ver qué datos estamos obteniendo
+    console.log('🔍 Fetching history for:', {
+      disposer_id: item.disposer_id,
+      waste_id: item.waste_id,
+      current_price: item.price,
+      disposer: item.disposer_legal_name,
+      waste: item.waste_name
+    })
+    
+    await fetchHistory(item.disposer_id, item.waste_id)
   }
 
   const handleSubmitUpdate = async (e: React.FormEvent) => {
@@ -337,13 +356,24 @@ export default function ValorizacionPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleUpdatePrice(item)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewHistory(item)}
+                              title="Ver historial de precios"
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdatePrice(item)}
+                              title="Actualizar precio"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -435,6 +465,197 @@ export default function ValorizacionPage() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Historial de Precios */}
+        <Dialog open={isHistoryDialogOpen} onOpenChange={(open) => {
+          setIsHistoryDialogOpen(open)
+          if (!open) {
+            clearHistory()
+            setSelectedItem(null)
+          }
+        }}>
+          <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                Historial de Precios
+              </DialogTitle>
+              <DialogDescription>
+                {selectedItem && (
+                  <>
+                    Historial de precios para <strong>{selectedItem.waste_name}</strong> ({selectedItem.waste_code}) 
+                    del dispositor <strong>{selectedItem.disposer_legal_name}</strong>
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="flex-1 overflow-auto">
+              {historyError ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="text-center">
+                    <p className="text-destructive mb-2">Error: {historyError}</p>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => selectedItem && fetchHistory(selectedItem.disposer_id, selectedItem.waste_id)}
+                    >
+                      Reintentar
+                    </Button>
+                  </div>
+                </div>
+              ) : isLoadingHistory ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <span className="ml-2">Cargando historial...</span>
+                </div>
+              ) : history.length === 0 ? (
+                <div className="flex items-center justify-center h-32">
+                  <p className="text-muted-foreground">No hay historial de precios disponible</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Resumen estadístico */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg">Resumen Estadístico</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Precio Actual</p>
+                          <p className="text-lg font-bold text-blue-600">
+                            {selectedItem?.currency_symbol}{typeof selectedItem?.price === 'number' ? selectedItem.price.toFixed(2) : '0.00'}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Precio Máximo</p>
+                          <p className="text-lg font-bold text-green-600">
+                            {selectedItem?.currency_symbol}{
+                              history.length > 0 
+                                ? Math.max(...history.map(h => Number(h.price) || 0)).toFixed(2)
+                                : '0.00'
+                            }
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Precio Mínimo</p>
+                          <p className="text-lg font-bold text-red-600">
+                            {selectedItem?.currency_symbol}{
+                              history.length > 0 
+                                ? Math.min(...history.map(h => Number(h.price) || 0)).toFixed(2)
+                                : '0.00'
+                            }
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Promedio</p>
+                          <p className="text-lg font-bold text-purple-600">
+                            {selectedItem?.currency_symbol}{
+                              history.length > 0 
+                                ? (history.reduce((sum, h) => sum + (Number(h.price) || 0), 0) / history.length).toFixed(2)
+                                : '0.00'
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Tabla de historial */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg">Historial Detallado</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Precio</TableHead>
+                            <TableHead>Período</TableHead>
+                            <TableHead>Fuente</TableHead>
+                            <TableHead>Notas</TableHead>
+                            <TableHead>Tendencia</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {history.map((item, index) => {
+                            const currentPrice = Number(item.price) || 0
+                            const prevPrice = index < history.length - 1 ? Number(history[index + 1].price) || 0 : currentPrice
+                            const priceChange = currentPrice - prevPrice
+                            const percentageChange = prevPrice !== 0 ? (priceChange / prevPrice) * 100 : 0
+                            
+                            return (
+                              <TableRow key={item.id}>
+                                <TableCell>
+                                  <div>
+                                    <div className="font-medium">
+                                      {new Date(item.created_at).toLocaleDateString()}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {new Date(item.created_at).toLocaleTimeString()}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="font-bold text-lg">
+                                    {selectedItem?.currency_symbol}{currentPrice.toFixed(2)}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs">
+                                    {item.price_period}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {item.source || '-'}
+                                </TableCell>
+                                <TableCell>
+                                  {item.notes || '-'}
+                                </TableCell>
+                                <TableCell>
+                                  {index < history.length - 1 && (
+                                    <div className="flex items-center gap-1">
+                                      {priceChange > 0 ? (
+                                        <TrendingUp className="h-4 w-4 text-green-600" />
+                                      ) : priceChange < 0 ? (
+                                        <TrendingDown className="h-4 w-4 text-red-600" />
+                                      ) : (
+                                        <div className="h-4 w-4" />
+                                      )}
+                                      <span className={`text-sm ${
+                                        priceChange > 0 ? 'text-green-600' : 
+                                        priceChange < 0 ? 'text-red-600' : 
+                                        'text-gray-600'
+                                      }`}>
+                                        {priceChange !== 0 && (
+                                          <>
+                                            {priceChange > 0 ? '+' : ''}{selectedItem?.currency_symbol}{Math.abs(priceChange).toFixed(2)}
+                                            {' '}({percentageChange > 0 ? '+' : ''}{percentageChange.toFixed(1)}%)
+                                          </>
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsHistoryDialogOpen(false)}>
+                Cerrar
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
