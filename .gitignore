@@ -5,6 +5,10 @@ dist
 tmp
 out-tsc
 
+# Next.js
+.next/
+*.tsbuildinfo
+
 # dependencies
 node_modules
 

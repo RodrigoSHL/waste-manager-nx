@@ -18,9 +18,14 @@
       }
     },
     "lint": {
-      "executor": "@nx/linter:eslint",
+      "executor": "@nx/eslint:lint",
       "options": {
-        "lintFilePatterns": ["apps/waste-manager-web/**/*.{ts,tsx,js,jsx}"]
+        "lintFilePatterns": ["apps/waste-manager-web/**/*.{ts,tsx,js,jsx}"],
+        "exclude": [
+          "apps/waste-manager-web/.next/**/*",
+          "apps/waste-manager-web/dist/**/*",
+          "apps/waste-manager-web/node_modules/**/*"
+        ]
       }
     }
   },
