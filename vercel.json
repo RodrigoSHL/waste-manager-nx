@@ -1,5 +1,6 @@
 {
-  "buildCommand": "npx nx build waste-manager-web --prod",
+  "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist/apps/waste-manager-web",
-  "installCommand": "npm install --legacy-peer-deps"
+  "installCommand": "npm install",
+  "framework": null
 }
