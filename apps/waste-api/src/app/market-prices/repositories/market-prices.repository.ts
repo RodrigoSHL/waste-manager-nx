@@ -427,7 +427,7 @@ export class MarketPricesRepository {
 
   // --- Migrations ---
   async runMigrations(): Promise<void> {
-    const migrationPath = join(process.cwd(), 'migrations', '1700000000001-add-waste-hierarchy.sql');
+    const migrationPath = join(process.cwd(), 'migrations', '1700000000000-init-market-prices.sql');
     
     try {
       const migrationSQL = readFileSync(migrationPath, 'utf8');
