@@ -21,19 +21,28 @@ export class DisposerContact {
   disposer_id!: number;
 
   @Column({ type: 'varchar', length: 255 })
-  contact_name!: string;
+  name!: string;
 
-  @Column({ type: 'varchar', length: 255 })
-  email!: string;
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  position?: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  email?: string;
 
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone?: string;
 
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  mobile?: string;
+
   @Column({ type: 'varchar', length: 100, nullable: true })
-  role?: string;
+  department?: string;
 
   @Column({ type: 'boolean', default: false })
   is_primary!: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  is_active!: boolean;
 
   @CreateDateColumn()
   created_at!: Date;

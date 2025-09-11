@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Disposer } from '../entities/disposer.entity';
 import { DisposerContact } from '../entities/disposer-contact.entity';
 import { Waste } from '../entities/waste.entity';
+import { WasteType } from '../entities/waste-type.entity';
+import { WasteCategory } from '../entities/waste-category.entity';
 import { Uom } from '../entities/uom.entity';
 import { Currency } from '../entities/currency.entity';
 import { DisposerWaste } from '../entities/disposer-waste.entity';
@@ -22,6 +24,10 @@ export class SeedMarketPrices {
     private readonly disposerContactRepository: Repository<DisposerContact>,
     @InjectRepository(Waste)
     private readonly wasteRepository: Repository<Waste>,
+    @InjectRepository(WasteType)
+    private readonly wasteTypeRepository: Repository<WasteType>,
+    @InjectRepository(WasteCategory)
+    private readonly wasteCategoryRepository: Repository<WasteCategory>,
     @InjectRepository(DisposerWaste)
     private readonly disposerWasteRepository: Repository<DisposerWaste>,
     @InjectRepository(PriceHistory)
@@ -31,22 +37,30 @@ export class SeedMarketPrices {
   async run() {
     console.log('🌱 Iniciando seeds de Market Prices...');
 
-    // 1. Seed UOMs
-    await this.seedUoms();
+    // Verificar si la migración ya se ejecutó y tenemos datos base
+    const uomCount = await this.uomRepository.count();
+    const currencyCount = await this.currencyRepository.count();
+    
+    if (uomCount === 0 || currencyCount === 0) {
+      console.log('⚠️  No se encontraron datos base. Ejecuta la migración primero.');
+      // 1. Seed UOMs (solo si no existen)
+      await this.seedUoms();
+      // 2. Seed Currencies (solo si no existen)
+      await this.seedCurrencies();
+    } else {
+      console.log('✓ Datos base ya existen (UOMs, Currencies, WasteTypes, WasteCategories)');
+    }
 
-    // 2. Seed Currencies
-    await this.seedCurrencies();
-
-    // 3. Seed Disposers
+    // 3. Seed Disposers (empresas ejemplo)
     await this.seedDisposers();
 
-    // 4. Seed Wastes
+    // 4. Seed Wastes (residuos específicos)
     await this.seedWastes();
 
     // 5. Seed DisposerWastes (relaciones)
     await this.seedDisposerWastes();
 
-    // 6. Seed Price History
+    // 6. Seed Price History (precios ejemplo)
     await this.seedPriceHistory();
 
     console.log('✅ Seeds de Market Prices completados exitosamente');
@@ -104,17 +118,17 @@ export class SeedMarketPrices {
         is_active: true,
         contacts: [
           {
-            contact_name: 'Juan Pérez',
+            name: 'Juan Pérez',
+            position: 'Gerente Comercial',
             email: 'juan.perez@bravo-energy.cl',
             phone: '+56912345678',
-            role: 'Gerente Comercial',
             is_primary: true,
           },
           {
-            contact_name: 'María González',
+            name: 'María González',
+            position: 'Coordinadora de Residuos',
             email: 'maria.gonzalez@bravo-energy.cl',
             phone: '+56987654321',
-            role: 'Coordinadora de Residuos',
             is_primary: false,
           },
         ],
@@ -127,10 +141,10 @@ export class SeedMarketPrices {
         is_active: true,
         contacts: [
           {
-            contact_name: 'Carlos Silva',
+            name: 'Carlos Silva',
+            position: 'Director General',
             email: 'carlos.silva@rbf.cl',
             phone: '+56911111111',
-            role: 'Director General',
             is_primary: true,
           },
         ],
@@ -143,10 +157,10 @@ export class SeedMarketPrices {
         is_active: true,
         contacts: [
           {
-            contact_name: 'Ana Rodríguez',
+            name: 'Ana Rodríguez',
+            position: 'Gerente de Operaciones',
             email: 'ana.rodriguez@ecowaste.cl',
             phone: '+56922222222',
-            role: 'Gerente de Operaciones',
             is_primary: true,
           },
         ],
@@ -179,37 +193,117 @@ export class SeedMarketPrices {
   }
 
   private async seedWastes() {
+    console.log('  🗂️ Creando residuos específicos con jerarquía...');
+
+    // Obtener categorías existentes (creadas por la migración)
+    const petCategory = await this.wasteCategoryRepository.findOne({
+      where: { code: 'PET' }
+    });
+    
+    const leadAcidCategory = await this.wasteCategoryRepository.findOne({
+      where: { code: 'LEAD_ACID' }
+    });
+    
+    const copperCategory = await this.wasteCategoryRepository.findOne({
+      where: { code: 'COPPER' }
+    });
+    
+    const cardboardCategory = await this.wasteCategoryRepository.findOne({
+      where: { code: 'CARDBOARD' }
+    });
+
+    if (!petCategory || !leadAcidCategory || !copperCategory || !cardboardCategory) {
+      console.log('  ⚠️  Error: No se encontraron las categorías necesarias. Ejecuta la migración primero.');
+      return;
+    }
+
     const wastes = [
       {
-        code: 'PLASTIC-001',
-        name: 'Plástico PET',
-        description: 'Plástico polietileno tereftalato (botellas)',
-        hazard_class: undefined,
+        code: 'PET-BOTTLE-DRINK',
+        name: 'Botella PET Bebida',
+        subproductName: 'Botella de bebida',
+        description: 'Botellas PET transparentes de bebidas (500ml-2L)',
+        hazardClass: undefined,
+        wasteCategoryId: petCategory.id,
+        specifications: {
+          capacity_range: '500ml-2L',
+          color: 'transparent',
+          closure_type: 'screw_cap',
+          typical_weight: '20-50g'
+        },
+        isActive: true
       },
       {
-        code: 'BATTERY-001',
-        name: 'Baterías de Plomo',
-        description: 'Baterías de plomo-ácido usadas',
-        hazard_class: 'H8',
+        code: 'PET-CONTAINER-FOOD',
+        name: 'Envase PET Alimentario',
+        subproductName: 'Envase de comida',
+        description: 'Envases PET para productos alimentarios',
+        hazardClass: undefined,
+        wasteCategoryId: petCategory.id,
+        specifications: {
+          food_grade: true,
+          shapes: ['rectangular', 'round'],
+          typical_weight: '15-40g'
+        },
+        isActive: true
       },
       {
-        code: 'METAL-001',
-        name: 'Chatarra de Cobre',
-        description: 'Restos de cobre y aleaciones',
-        hazard_class: undefined,
+        code: 'LEAD-BATTERY-AUTO',
+        name: 'Batería Automotriz',
+        subproductName: 'Batería de automóvil',
+        description: 'Baterías de plomo-ácido de vehículos',
+        hazardClass: 'H8',
+        wasteCategoryId: leadAcidCategory.id,
+        specifications: {
+          voltage: '12V',
+          typical_weight: '15-25kg',
+          lead_content: '60-70%',
+          electrolyte: 'sulfuric_acid'
+        },
+        isActive: true
       },
       {
-        code: 'PAPER-001',
-        name: 'Papel y Cartón',
-        description: 'Papel y cartón para reciclaje',
-        hazard_class: undefined,
+        code: 'COPPER-WIRE-CLEAN',
+        name: 'Cable de Cobre Limpio',
+        subproductName: 'Cable sin aislante',
+        description: 'Cables de cobre sin aislamiento plástico',
+        hazardClass: undefined,
+        wasteCategoryId: copperCategory.id,
+        specifications: {
+          purity: '99%',
+          condition: 'clean',
+          typical_diameter: '1-10mm'
+        },
+        isActive: true
       },
       {
-        code: 'OIL-001',
-        name: 'Aceite Usado',
-        description: 'Aceites lubricantes usados',
-        hazard_class: 'H5',
+        code: 'COPPER-PIPE-USED',
+        name: 'Tubería de Cobre',
+        subproductName: 'Tubería usada',
+        description: 'Tuberías de cobre de instalaciones',
+        hazardClass: undefined,
+        wasteCategoryId: copperCategory.id,
+        specifications: {
+          purity: '95-99%',
+          condition: 'used',
+          typical_diameter: '15-50mm'
+        },
+        isActive: true
       },
+      {
+        code: 'CARDBOARD-BOX-CORRUGATED',
+        name: 'Cartón Corrugado',
+        subproductName: 'Caja corrugada',
+        description: 'Cajas de cartón corrugado para empaque',
+        hazardClass: undefined,
+        wasteCategoryId: cardboardCategory.id,
+        specifications: {
+          type: 'corrugated',
+          condition: 'clean_dry',
+          contamination_max: '5%'
+        },
+        isActive: true
+      }
     ];
 
     for (const wasteData of wastes) {
@@ -218,14 +312,27 @@ export class SeedMarketPrices {
       });
 
       if (!existing) {
-        const waste = this.wasteRepository.create(wasteData);
+        const waste = this.wasteRepository.create({
+          code: wasteData.code,
+          name: wasteData.name,
+          subproductName: wasteData.subproductName,
+          description: wasteData.description,
+          hazardClass: wasteData.hazardClass,
+          wasteCategoryId: wasteData.wasteCategoryId,
+          specifications: wasteData.specifications,
+          isActive: wasteData.isActive
+        });
         await this.wasteRepository.save(waste);
-        console.log(`  ✓ Residuo creado: ${wasteData.name}`);
+        console.log(`    ✓ Residuo creado: ${wasteData.name} (${wasteData.subproductName})`);
+      } else {
+        console.log(`    • Residuo ya existe: ${wasteData.name}`);
       }
     }
   }
 
   private async seedDisposerWastes() {
+    console.log('  🔗 Creando relaciones dispositor-residuo...');
+    
     // Obtener entidades necesarias
     const bravoEnergy = await this.disposerRepository.findOne({
       where: { rut: '76.123.456-7' },
@@ -237,97 +344,125 @@ export class SeedMarketPrices {
       where: { rut: '79.555.666-8' },
     });
 
-    const plastic = await this.wasteRepository.findOne({
-      where: { code: 'PLASTIC-001' },
+    // Buscar residuos con los nuevos códigos
+    const petBottle = await this.wasteRepository.findOne({
+      where: { code: 'PET-BOTTLE-DRINK' },
     });
-    const batteries = await this.wasteRepository.findOne({
-      where: { code: 'BATTERY-001' },
+    const petContainer = await this.wasteRepository.findOne({
+      where: { code: 'PET-CONTAINER-FOOD' },
     });
-    const copper = await this.wasteRepository.findOne({
-      where: { code: 'METAL-001' },
+    const leadBattery = await this.wasteRepository.findOne({
+      where: { code: 'LEAD-BATTERY-AUTO' },
     });
-    const paper = await this.wasteRepository.findOne({
-      where: { code: 'PAPER-001' },
+    const copperWire = await this.wasteRepository.findOne({
+      where: { code: 'COPPER-WIRE-CLEAN' },
     });
-    const oil = await this.wasteRepository.findOne({
-      where: { code: 'OIL-001' },
+    const copperPipe = await this.wasteRepository.findOne({
+      where: { code: 'COPPER-PIPE-USED' },
+    });
+    const cardboard = await this.wasteRepository.findOne({
+      where: { code: 'CARDBOARD-BOX-CORRUGATED' },
     });
 
     const tonUom = await this.uomRepository.findOne({ where: { code: 'ton' } });
     const kgUom = await this.uomRepository.findOne({ where: { code: 'kg' } });
-    const ltUom = await this.uomRepository.findOne({ where: { code: 'lt' } });
 
     const clpCurrency = await this.currencyRepository.findOne({
       where: { code: 'CLP' },
     });
 
+    if (!bravoEnergy || !rbfRecycling || !ecoWaste || !clpCurrency || !tonUom || !kgUom) {
+      console.log('  ⚠️  Error: No se encontraron las entidades base necesarias');
+      return;
+    }
+
     const relations = [
-      // Bravo Energy
+      // Bravo Energy - especializado en plásticos y metales
       {
         disposer: bravoEnergy,
-        waste: plastic,
+        waste: petBottle,
         uom: tonUom,
         currency: clpCurrency,
         min_lot: 5,
         lead_time_days: 7,
-        notes: 'Acepta mínimo 5 toneladas',
+        notes: 'Acepta botellas PET limpias, mínimo 5 toneladas',
       },
       {
         disposer: bravoEnergy,
-        waste: batteries,
-        uom: kgUom,
+        waste: petContainer,
+        uom: tonUom,
         currency: clpCurrency,
-        min_lot: 100,
-        lead_time_days: 3,
-        notes: 'Procesamiento especializado',
+        min_lot: 3,
+        lead_time_days: 7,
+        notes: 'Envases alimentarios, sin etiquetas preferible',
       },
       {
         disposer: bravoEnergy,
-        waste: copper,
+        waste: copperWire,
         uom: kgUom,
         currency: clpCurrency,
         min_lot: 50,
         lead_time_days: 2,
-        notes: 'Pago inmediato',
+        notes: 'Cable limpio sin aislante, pago inmediato',
       },
-      // RBF Recycling
+      
+      // RBF Recycling - maneja diversos materiales
       {
         disposer: rbfRecycling,
-        waste: plastic,
+        waste: petBottle,
         uom: tonUom,
         currency: clpCurrency,
         min_lot: 10,
         lead_time_days: 10,
-        notes: 'Volúmenes grandes',
+        notes: 'Volúmenes grandes, mejor precio por cantidad',
       },
       {
         disposer: rbfRecycling,
-        waste: paper,
+        waste: cardboard,
         uom: tonUom,
         currency: clpCurrency,
         min_lot: 2,
         lead_time_days: 5,
-        notes: 'Papel limpio únicamente',
-      },
-      // EcoWaste
-      {
-        disposer: ecoWaste,
-        waste: oil,
-        uom: ltUom,
-        currency: clpCurrency,
-        min_lot: 1000,
-        lead_time_days: 15,
-        notes: 'Servicio de retiro incluido',
+        notes: 'Cartón limpio y seco',
       },
       {
-        disposer: ecoWaste,
-        waste: batteries,
+        disposer: rbfRecycling,
+        waste: copperPipe,
         uom: kgUom,
         currency: clpCurrency,
-        min_lot: 200,
-        lead_time_days: 7,
-        notes: 'Certificado de disposición',
+        min_lot: 100,
+        lead_time_days: 3,
+        notes: 'Tubería usada, acepta con soldaduras',
       },
+      
+      // EcoWaste - especializado en baterías y metales
+      {
+        disposer: ecoWaste,
+        waste: leadBattery,
+        uom: kgUom,
+        currency: clpCurrency,
+        min_lot: 100,
+        lead_time_days: 3,
+        notes: 'Procesamiento especializado de baterías',
+      },
+      {
+        disposer: ecoWaste,
+        waste: copperWire,
+        uom: kgUom,
+        currency: clpCurrency,
+        min_lot: 25,
+        lead_time_days: 1,
+        notes: 'Procesamiento rápido, pago al contado',
+      },
+      {
+        disposer: ecoWaste,
+        waste: copperPipe,
+        uom: kgUom,
+        currency: clpCurrency,
+        min_lot: 50,
+        lead_time_days: 2,
+        notes: 'Separación automática de materiales',
+      }
     ];
 
     for (const relationData of relations) {
@@ -337,6 +472,7 @@ export class SeedMarketPrices {
         !relationData.uom ||
         !relationData.currency
       ) {
+        console.log('    ⚠️  Saltando relación incompleta');
         continue;
       }
 
@@ -368,6 +504,8 @@ export class SeedMarketPrices {
   }
 
   private async seedPriceHistory() {
+    console.log('  📈 Creando historial de precios...');
+    
     const disposerWastes = await this.disposerWasteRepository.find({
       relations: ['disposer', 'waste'],
     });
@@ -378,88 +516,97 @@ export class SeedMarketPrices {
     const threeMonthsAgo = new Date(now.getTime() - 3 * 30 * 24 * 60 * 60 * 1000);
 
     const priceData = [
-      // Bravo Energy - Plástico: 3000 -> 4000
+      // Bravo Energy - Botellas PET: 3000 -> 4000 CLP/ton
       {
         disposer_rut: '76.123.456-7',
-        waste_code: 'PLASTIC-001',
+        waste_code: 'PET-BOTTLE-DRINK',
         prices: [
-          { price: 3000, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Cotización inicial' },
-          { price: 4000, start: threeMonthsAgo, end: null, source: 'Actualización trimestral' },
+          { price: 3000, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Cotización inicial botellas PET' },
+          { price: 4000, start: threeMonthsAgo, end: null, source: 'Actualización por alta demanda' },
         ],
       },
-      // RBF Recycling - Plástico: 4000 -> 3000
+      // Bravo Energy - Envases PET: 2800 -> 3500 CLP/ton
+      {
+        disposer_rut: '76.123.456-7',
+        waste_code: 'PET-CONTAINER-FOOD',
+        prices: [
+          { price: 2800, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio base envases alimentarios' },
+          { price: 3500, start: threeMonthsAgo, end: null, source: 'Incremento por calidad' },
+        ],
+      },
+      // RBF Recycling - Botellas PET: 4000 -> 3000 CLP/ton
       {
         disposer_rut: '78.987.654-3',
-        waste_code: 'PLASTIC-001',
+        waste_code: 'PET-BOTTLE-DRINK',
         prices: [
-          { price: 4000, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio base' },
-          { price: 3000, start: threeMonthsAgo, end: null, source: 'Ajuste por mercado' },
+          { price: 4000, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio competitivo inicial' },
+          { price: 3000, start: threeMonthsAgo, end: null, source: 'Ajuste por exceso de oferta' },
         ],
       },
-      // Bravo Energy - Baterías: 350 -> 370
+      // Bravo Energy - Cable Cobre Limpio: 8500 -> 9200 CLP/kg
       {
         disposer_rut: '76.123.456-7',
-        waste_code: 'BATTERY-001',
+        waste_code: 'COPPER-WIRE-CLEAN',
         prices: [
-          { price: 350, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio estándar' },
-          { price: 370, start: threeMonthsAgo, end: null, source: 'Incremento por demanda' },
+          { price: 8500, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio LME base cable limpio' },
+          { price: 9200, start: threeMonthsAgo, end: null, source: 'Alza internacional del cobre' },
         ],
       },
-      // Bravo Energy - Cobre: 8500 -> 9200
+      // EcoWaste - Cable Cobre Limpio: 8300 -> 9000 CLP/kg
       {
-        disposer_rut: '76.123.456-7',
-        waste_code: 'METAL-001',
+        disposer_rut: '79.555.666-8',
+        waste_code: 'COPPER-WIRE-CLEAN',
         prices: [
-          { price: 8500, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio LME base' },
-          { price: 9200, start: threeMonthsAgo, end: null, source: 'Alza internacional' },
+          { price: 8300, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio competitivo cable' },
+          { price: 9000, start: threeMonthsAgo, end: null, source: 'Seguimiento mercado internacional' },
         ],
       },
-      // RBF Recycling - Papel: 150 -> 180
+      // RBF Recycling - Tubería Cobre: 7800 -> 8200 CLP/kg
       {
         disposer_rut: '78.987.654-3',
-        waste_code: 'PAPER-001',
+        waste_code: 'COPPER-PIPE-USED',
         prices: [
-          { price: 150, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio mercado local' },
-          { price: 180, start: threeMonthsAgo, end: null, source: 'Mayor demanda' },
+          { price: 7800, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio tubería con soldaduras' },
+          { price: 8200, start: threeMonthsAgo, end: null, source: 'Incremento por procesamiento' },
         ],
       },
-      // EcoWaste - Aceite: 50 -> 60
+      // EcoWaste - Baterías Plomo: 350 -> 380 CLP/kg
       {
         disposer_rut: '79.555.666-8',
-        waste_code: 'OIL-001',
+        waste_code: 'LEAD-BATTERY-AUTO',
         prices: [
-          { price: 50, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Tarifa estándar' },
-          { price: 60, start: threeMonthsAgo, end: null, source: 'Ajuste por costos' },
+          { price: 350, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio estándar baterías auto' },
+          { price: 380, start: threeMonthsAgo, end: null, source: 'Incremento por demanda plomo' },
         ],
       },
-      // EcoWaste - Baterías: 320 actual
+      // RBF Recycling - Cartón: 150 -> 180 CLP/ton
       {
-        disposer_rut: '79.555.666-8',
-        waste_code: 'BATTERY-001',
+        disposer_rut: '78.987.654-3',
+        waste_code: 'CARDBOARD-BOX-CORRUGATED',
         prices: [
-          { price: 320, start: threeMonthsAgo, end: null, source: 'Precio competitivo' },
+          { price: 150, start: sixMonthsAgo, end: threeMonthsAgo, source: 'Precio base cartón corrugado' },
+          { price: 180, start: threeMonthsAgo, end: null, source: 'Alza por escasez papel' },
         ],
-      },
+      }
     ];
 
     for (const item of priceData) {
       const disposerWaste = disposerWastes.find(
         (dw) =>
           dw.disposer.rut === item.disposer_rut &&
-          dw.waste.code === item.waste_code,
+          dw.waste.code === item.waste_code
       );
 
-      if (!disposerWaste) continue;
+      if (!disposerWaste) {
+        console.log(`    ⚠️  No se encontró relación para ${item.disposer_rut} - ${item.waste_code}`);
+        continue;
+      }
 
       for (const priceInfo of item.prices) {
-        const period = priceInfo.end 
-          ? `[${priceInfo.start.toISOString()},${priceInfo.end.toISOString()})`
-          : `[${priceInfo.start.toISOString()},)`;
-
         const existing = await this.priceHistoryRepository.findOne({
           where: {
             disposer_waste_id: disposerWaste.id,
-            price_period: period,
+            price_period: `[${priceInfo.start.toISOString()},${priceInfo.end?.toISOString() || ''})`,
           },
         });
 
@@ -467,18 +614,17 @@ export class SeedMarketPrices {
           const priceHistory = this.priceHistoryRepository.create({
             disposer_waste_id: disposerWaste.id,
             price: priceInfo.price,
-            price_period: period,
+            price_period: `[${priceInfo.start.toISOString()},${priceInfo.end?.toISOString() || ''})`,
             source: priceInfo.source,
-            notes: `Precio histórico generado por seed`,
+            notes: `Precio histórico para ${disposerWaste.waste.name}`,
           });
 
           await this.priceHistoryRepository.save(priceHistory);
+          console.log(`    ✓ Precio creado: ${disposerWaste.disposer.trade_name} - ${disposerWaste.waste.name}: $${priceInfo.price}`);
+        } else {
+          console.log(`    • Precio ya existe: ${disposerWaste.disposer.trade_name} - ${disposerWaste.waste.name}`);
         }
       }
-
-      console.log(
-        `  ✓ Historial de precios creado: ${disposerWaste.disposer.trade_name} - ${disposerWaste.waste.name}`,
-      );
     }
   }
 }

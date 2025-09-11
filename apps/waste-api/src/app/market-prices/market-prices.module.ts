@@ -5,6 +5,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Disposer } from './entities/disposer.entity';
 import { DisposerContact } from './entities/disposer-contact.entity';
 import { Waste } from './entities/waste.entity';
+import { WasteType } from './entities/waste-type.entity';
+import { WasteCategory } from './entities/waste-category.entity';
 import { Uom } from './entities/uom.entity';
 import { Currency } from './entities/currency.entity';
 import { DisposerWaste } from './entities/disposer-waste.entity';
@@ -28,6 +30,8 @@ import { SeedMarketPrices } from './seed/seed-market-prices';
       Disposer,
       DisposerContact,
       Waste,
+      WasteType,
+      WasteCategory,
       Uom,
       Currency,
       DisposerWaste,

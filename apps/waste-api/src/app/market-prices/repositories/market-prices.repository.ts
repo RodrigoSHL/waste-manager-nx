@@ -1,11 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Disposer } from '../entities/disposer.entity';
 import { Waste } from '../entities/waste.entity';
+import { WasteType } from '../entities/waste-type.entity';
+import { WasteCategory } from '../entities/waste-category.entity';
 import { DisposerWaste } from '../entities/disposer-waste.entity';
 import { PriceHistory } from '../entities/price-history.entity';
 import { CreateWasteDto, UpdateWasteDto } from '../dto/waste.dto';
+import { CreateWasteTypeDto } from '../dto/waste-type.dto';
+import { CreateWasteCategoryDto } from '../dto/waste-category.dto';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class MarketPricesRepository {
@@ -14,10 +20,15 @@ export class MarketPricesRepository {
     private readonly disposerRepository: Repository<Disposer>,
     @InjectRepository(Waste)
     private readonly wasteRepository: Repository<Waste>,
+    @InjectRepository(WasteType)
+    private readonly wasteTypeRepository: Repository<WasteType>,
+    @InjectRepository(WasteCategory)
+    private readonly wasteCategoryRepository: Repository<WasteCategory>,
     @InjectRepository(DisposerWaste)
     private readonly disposerWasteRepository: Repository<DisposerWaste>,
     @InjectRepository(PriceHistory)
     private readonly priceHistoryRepository: Repository<PriceHistory>,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -292,5 +303,137 @@ export class MarketPricesRepository {
       },
     });
     return count > 0;
+  }
+
+  // ===== MÉTODOS PARA JERARQUÍA DE RESIDUOS =====
+
+  // --- Waste Types ---
+  async getAllWasteTypes(): Promise<WasteType[]> {
+    return this.wasteTypeRepository.find({
+      where: { isActive: true },
+      order: { name: 'ASC' },
+      relations: ['categories'],
+    });
+  }
+
+  async findWasteTypeById(id: number): Promise<WasteType | null> {
+    return this.wasteTypeRepository.findOne({
+      where: { id },
+      relations: ['categories'],
+    });
+  }
+
+  async findWasteTypeByCode(code: string): Promise<WasteType | null> {
+    return this.wasteTypeRepository.findOne({
+      where: { code },
+    });
+  }
+
+  async findWasteTypeByName(name: string): Promise<WasteType | null> {
+    return this.wasteTypeRepository.findOne({
+      where: { name },
+    });
+  }
+
+  async createWasteType(createWasteTypeDto: CreateWasteTypeDto): Promise<WasteType> {
+    const wasteType = this.wasteTypeRepository.create(createWasteTypeDto);
+    return this.wasteTypeRepository.save(wasteType);
+  }
+
+  // --- Waste Categories ---
+  async getAllWasteCategories(): Promise<WasteCategory[]> {
+    return this.wasteCategoryRepository.find({
+      where: { isActive: true },
+      order: { name: 'ASC' },
+      relations: ['wasteType', 'wastes'],
+    });
+  }
+
+  async getWasteCategoriesByType(wasteTypeId: number): Promise<WasteCategory[]> {
+    return this.wasteCategoryRepository.find({
+      where: { 
+        wasteTypeId,
+        isActive: true 
+      },
+      order: { name: 'ASC' },
+      relations: ['wastes'],
+    });
+  }
+
+  async findWasteCategoryById(id: number): Promise<WasteCategory | null> {
+    return this.wasteCategoryRepository.findOne({
+      where: { id },
+      relations: ['wasteType', 'wastes'],
+    });
+  }
+
+  async findWasteCategoryByCode(code: string): Promise<WasteCategory | null> {
+    return this.wasteCategoryRepository.findOne({
+      where: { code },
+    });
+  }
+
+  async findWasteCategoryByName(name: string): Promise<WasteCategory | null> {
+    return this.wasteCategoryRepository.findOne({
+      where: { name },
+    });
+  }
+
+  async createWasteCategory(createWasteCategoryDto: CreateWasteCategoryDto): Promise<WasteCategory> {
+    const wasteCategory = this.wasteCategoryRepository.create(createWasteCategoryDto);
+    return this.wasteCategoryRepository.save(wasteCategory);
+  }
+
+  // --- Wastes by Category ---
+  async getWastesByCategory(wasteCategoryId: number): Promise<Waste[]> {
+    return this.wasteRepository.find({
+      where: { 
+        wasteCategoryId,
+        isActive: true 
+      },
+      order: { subproductName: 'ASC' },
+      relations: ['wasteCategory', 'wasteCategory.wasteType'],
+    });
+  }
+
+  // --- Hierarchy Views ---
+  async getWasteHierarchy() {
+    return this.dataSource.query(`
+      SELECT 
+        wt.id as type_id,
+        wt.code as type_code,
+        wt.name as type_name,
+        wt.color as type_color,
+        wt.icon as type_icon,
+        wc.id as category_id,
+        wc.code as category_code,
+        wc.name as category_name,
+        wc.technical_specs as category_specs,
+        w.id as waste_id,
+        w.code as waste_code,
+        w.name as waste_name,
+        w.subproduct_name,
+        w.description as waste_description,
+        w.hazard_class,
+        w.specifications as waste_specs,
+        CONCAT(wt.name, ' > ', wc.name, ' > ', COALESCE(w.subproduct_name, w.name)) as full_hierarchy
+      FROM waste_types wt
+      LEFT JOIN waste_categories wc ON wt.id = wc.waste_type_id AND wc.is_active = true
+      LEFT JOIN wastes w ON wc.id = w.waste_category_id AND w.is_active = true
+      WHERE wt.is_active = true
+      ORDER BY wt.name, wc.name, w.subproduct_name, w.name
+    `);
+  }
+
+  // --- Migrations ---
+  async runMigrations(): Promise<void> {
+    const migrationPath = join(process.cwd(), 'migrations', '1700000000001-add-waste-hierarchy.sql');
+    
+    try {
+      const migrationSQL = readFileSync(migrationPath, 'utf8');
+      await this.dataSource.query(migrationSQL);
+    } catch (error) {
+      throw new Error(`Error ejecutando migración de jerarquía: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
   }
 }

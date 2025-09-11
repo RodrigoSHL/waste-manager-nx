@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { MarketPricesRepository } from '../repositories/market-prices.repository';
 import { CreateWasteDto, UpdateWasteDto } from '../dto/waste.dto';
+import { CreateWasteTypeDto, UpdateWasteTypeDto } from '../dto/waste-type.dto';
+import { CreateWasteCategoryDto, UpdateWasteCategoryDto } from '../dto/waste-category.dto';
 
 @Injectable()
 export class MarketPricesService {
@@ -253,5 +255,114 @@ export class MarketPricesService {
       throw new NotFoundException(`Residuo con ID ${wasteId} no encontrado`);
     }
     return waste;
+  }
+
+  // ===== MÉTODOS PARA JERARQUÍA DE RESIDUOS =====
+
+  /**
+   * Obtiene todos los tipos de residuos
+   */
+  async getAllWasteTypes() {
+    return this.marketPricesRepository.getAllWasteTypes();
+  }
+
+  /**
+   * Obtiene un tipo de residuo por ID
+   */
+  async getWasteTypeById(wasteTypeId: number) {
+    const wasteType = await this.marketPricesRepository.findWasteTypeById(wasteTypeId);
+    if (!wasteType) {
+      throw new NotFoundException(`Tipo de residuo con ID ${wasteTypeId} no encontrado`);
+    }
+    return wasteType;
+  }
+
+  /**
+   * Crea un nuevo tipo de residuo
+   */
+  async createWasteType(createWasteTypeDto: CreateWasteTypeDto) {
+    // Verificar que no exista otro tipo con el mismo código
+    const existingByCode = await this.marketPricesRepository.findWasteTypeByCode(createWasteTypeDto.code);
+    if (existingByCode) {
+      throw new BadRequestException(`Ya existe un tipo de residuo con el código '${createWasteTypeDto.code}'`);
+    }
+
+    // Verificar que no exista otro tipo con el mismo nombre
+    const existingByName = await this.marketPricesRepository.findWasteTypeByName(createWasteTypeDto.name);
+    if (existingByName) {
+      throw new BadRequestException(`Ya existe un tipo de residuo con el nombre '${createWasteTypeDto.name}'`);
+    }
+
+    return this.marketPricesRepository.createWasteType(createWasteTypeDto);
+  }
+
+  /**
+   * Obtiene todas las categorías de residuos
+   */
+  async getAllWasteCategories() {
+    return this.marketPricesRepository.getAllWasteCategories();
+  }
+
+  /**
+   * Obtiene categorías de un tipo específico
+   */
+  async getWasteCategoriesByType(wasteTypeId: number) {
+    await this.getWasteTypeById(wasteTypeId); // Esto ya valida que exista
+    return this.marketPricesRepository.getWasteCategoriesByType(wasteTypeId);
+  }
+
+  /**
+   * Obtiene una categoría por ID
+   */
+  async getWasteCategoryById(wasteCategoryId: number) {
+    const wasteCategory = await this.marketPricesRepository.findWasteCategoryById(wasteCategoryId);
+    if (!wasteCategory) {
+      throw new NotFoundException(`Categoría de residuo con ID ${wasteCategoryId} no encontrada`);
+    }
+    return wasteCategory;
+  }
+
+  /**
+   * Crea una nueva categoría de residuo
+   */
+  async createWasteCategory(createWasteCategoryDto: CreateWasteCategoryDto) {
+    // Verificar que el tipo de residuo existe
+    await this.getWasteTypeById(createWasteCategoryDto.wasteTypeId); // Esto ya valida que exista
+
+    // Verificar que no exista otra categoría con el mismo código
+    const existingByCode = await this.marketPricesRepository.findWasteCategoryByCode(createWasteCategoryDto.code);
+    if (existingByCode) {
+      throw new BadRequestException(`Ya existe una categoría de residuo con el código '${createWasteCategoryDto.code}'`);
+    }
+
+    // Verificar que no exista otra categoría con el mismo nombre
+    const existingByName = await this.marketPricesRepository.findWasteCategoryByName(createWasteCategoryDto.name);
+    if (existingByName) {
+      throw new BadRequestException(`Ya existe una categoría de residuo con el nombre '${createWasteCategoryDto.name}'`);
+    }
+
+    return this.marketPricesRepository.createWasteCategory(createWasteCategoryDto);
+  }
+
+  /**
+   * Obtiene residuos de una categoría específica
+   */
+  async getWastesByCategory(wasteCategoryId: number) {
+    await this.getWasteCategoryById(wasteCategoryId); // Esto ya valida que exista
+    return this.marketPricesRepository.getWastesByCategory(wasteCategoryId);
+  }
+
+  /**
+   * Obtiene la jerarquía completa de residuos
+   */
+  async getWasteHierarchy() {
+    return this.marketPricesRepository.getWasteHierarchy();
+  }
+
+  /**
+   * Ejecuta las migraciones de base de datos
+   */
+  async runMigrations() {
+    return this.marketPricesRepository.runMigrations();
   }
 }
