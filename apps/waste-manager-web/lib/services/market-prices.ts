@@ -1,11 +1,16 @@
 import { 
   Disposer, 
-  Waste, 
+  Waste,
+  WasteType,
+  WasteCategory,
+  WasteHierarchy,
   LatestPrice, 
   WasteComparison, 
   WasteStats,
   CreateDisposerDto,
   CreateWasteDto,
+  CreateWasteTypeDto,
+  CreateWasteCategoryDto,
   UpdateWasteDto,
   UpdatePriceDto,
   UpsertPriceResponse,
@@ -117,6 +122,51 @@ class MarketPricesService {
     return this.request<{ message: string }>('/market-prices/seed', {
       method: 'POST',
     });
+  }
+
+  // Waste Types (Tipos de residuos)
+  async getWasteTypes(): Promise<WasteType[]> {
+    return this.request<WasteType[]>('/market-prices/waste-types');
+  }
+
+  async getWasteTypeById(typeId: number): Promise<WasteType> {
+    return this.request<WasteType>(`/market-prices/waste-types/${typeId}`);
+  }
+
+  async createWasteType(data: CreateWasteTypeDto): Promise<WasteType> {
+    return this.request<WasteType>('/market-prices/waste-types', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getWasteTypeCategories(typeId: number): Promise<WasteCategory[]> {
+    return this.request<WasteCategory[]>(`/market-prices/waste-types/${typeId}/categories`);
+  }
+
+  // Waste Categories (Categorías de residuos)
+  async getWasteCategories(): Promise<WasteCategory[]> {
+    return this.request<WasteCategory[]>('/market-prices/waste-categories');
+  }
+
+  async getWasteCategoryById(categoryId: number): Promise<WasteCategory> {
+    return this.request<WasteCategory>(`/market-prices/waste-categories/${categoryId}`);
+  }
+
+  async createWasteCategory(data: CreateWasteCategoryDto): Promise<WasteCategory> {
+    return this.request<WasteCategory>('/market-prices/waste-categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getWasteCategoryWastes(categoryId: number): Promise<Waste[]> {
+    return this.request<Waste[]>(`/market-prices/waste-categories/${categoryId}/wastes`);
+  }
+
+  // Waste Hierarchy (Vista completa de jerarquía)
+  async getWasteHierarchy(): Promise<WasteHierarchy[]> {
+    return this.request<WasteHierarchy[]>('/market-prices/waste-hierarchy');
   }
 }
 

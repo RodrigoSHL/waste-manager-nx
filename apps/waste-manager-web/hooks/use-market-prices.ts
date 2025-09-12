@@ -4,12 +4,17 @@ import { useState, useEffect } from 'react';
 import { marketPricesService } from '@/lib/services/market-prices';
 import { 
   Disposer, 
-  Waste, 
+  Waste,
+  WasteType,
+  WasteCategory,
+  WasteHierarchy,
   LatestPrice, 
   WasteComparison, 
   WasteStats,
   CreateDisposerDto,
   CreateWasteDto,
+  CreateWasteTypeDto,
+  CreateWasteCategoryDto,
   UpdateWasteDto,
   PriceOverview,
   PriceHistory
@@ -296,5 +301,133 @@ export function usePriceHistory() {
     error,
     fetchHistory,
     clearHistory,
+  };
+}
+
+// Hook para tipos de residuos (Waste Types)
+export function useWasteTypes() {
+  const [wasteTypes, setWasteTypes] = useState<WasteType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWasteTypes = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await marketPricesService.getWasteTypes();
+      setWasteTypes(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error cargando tipos de residuos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createWasteType = async (data: CreateWasteTypeDto) => {
+    try {
+      const newWasteType = await marketPricesService.createWasteType(data);
+      setWasteTypes(prev => [...prev, newWasteType]);
+      return newWasteType;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error creando tipo de residuo';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
+  useEffect(() => {
+    fetchWasteTypes();
+  }, []);
+
+  return {
+    wasteTypes,
+    isLoading,
+    error,
+    refetch: fetchWasteTypes,
+    createWasteType,
+  };
+}
+
+// Hook para categorías de residuos (Waste Categories)
+export function useWasteCategories(wasteTypeId?: number) {
+  const [wasteCategories, setWasteCategories] = useState<WasteCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWasteCategories = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      let data: WasteCategory[];
+      
+      if (wasteTypeId) {
+        // Obtener categorías de un tipo específico
+        data = await marketPricesService.getWasteTypeCategories(wasteTypeId);
+      } else {
+        // Obtener todas las categorías
+        data = await marketPricesService.getWasteCategories();
+      }
+      
+      setWasteCategories(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error cargando categorías de residuos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createWasteCategory = async (data: CreateWasteCategoryDto) => {
+    try {
+      const newWasteCategory = await marketPricesService.createWasteCategory(data);
+      setWasteCategories(prev => [...prev, newWasteCategory]);
+      return newWasteCategory;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error creando categoría de residuo';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
+  useEffect(() => {
+    fetchWasteCategories();
+  }, [wasteTypeId]);
+
+  return {
+    wasteCategories,
+    isLoading,
+    error,
+    refetch: fetchWasteCategories,
+    createWasteCategory,
+  };
+}
+
+// Hook para la jerarquía completa
+export function useWasteHierarchy() {
+  const [hierarchy, setHierarchy] = useState<WasteHierarchy[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchHierarchy = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await marketPricesService.getWasteHierarchy();
+      setHierarchy(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error cargando jerarquía de residuos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHierarchy();
+  }, []);
+
+  return {
+    hierarchy,
+    isLoading,
+    error,
+    refetch: fetchHierarchy,
   };
 }

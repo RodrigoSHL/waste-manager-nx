@@ -15,21 +15,79 @@ export interface Disposer {
 export interface DisposerContact {
   id: number;
   disposer_id: number;
-  contact_name: string;
-  email: string;
+  name: string;
+  position?: string;
+  email?: string;
   phone?: string;
-  role?: string;
+  mobile?: string;
+  department?: string;
   is_primary: boolean;
+  is_active: boolean;
   created_at: string;
 }
 
-export interface Waste {
+// Nuevos tipos para la jerarquía
+export interface WasteType {
   id: number;
   code: string;
   name: string;
   description?: string;
+  color?: string;
+  icon?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  categories: WasteCategory[];
+}
+
+export interface WasteCategory {
+  id: number;
+  wasteTypeId: number;
+  code: string;
+  name: string;
+  description?: string;
+  technicalSpecs?: Record<string, unknown>;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  wasteType?: WasteType;
+  wastes?: Waste[];
+}
+
+export interface Waste {
+  id: number;
+  wasteCategoryId: number;
+  code: string;
+  name: string;
+  subproductName?: string;
+  description?: string;
+  hazardClass?: string;
+  specifications?: Record<string, unknown>;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  wasteCategory?: WasteCategory;
+}
+
+// Tipo para la vista de jerarquía completa
+export interface WasteHierarchy {
+  type_id: number;
+  type_code: string;
+  type_name: string;
+  type_color?: string;
+  type_icon?: string;
+  category_id?: number;
+  category_code?: string;
+  category_name?: string;
+  category_specs?: Record<string, unknown>;
+  waste_id?: number;
+  waste_code?: string;
+  waste_name?: string;
+  subproduct_name?: string;
+  waste_description?: string;
   hazard_class?: string;
-  created_at: string;
+  waste_specs?: Record<string, unknown>;
+  full_hierarchy: string;
 }
 
 export interface Uom {
@@ -149,17 +207,39 @@ export interface CreateContactDto {
 }
 
 export interface CreateWasteDto {
+  wasteCategoryId: number;
   code: string;
   name: string;
+  subproductName?: string;
   description?: string;
-  hazard_class?: string;
+  hazardClass?: string;
+  specifications?: Record<string, unknown>;
 }
 
 export interface UpdateWasteDto {
+  wasteCategoryId?: number;
   code?: string;
   name?: string;
+  subproductName?: string;
   description?: string;
-  hazard_class?: string;
+  hazardClass?: string;
+  specifications?: Record<string, unknown>;
+}
+
+export interface CreateWasteTypeDto {
+  code: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+}
+
+export interface CreateWasteCategoryDto {
+  wasteTypeId: number;
+  code: string;
+  name: string;
+  description?: string;
+  technicalSpecs?: Record<string, unknown>;
 }
 
 export interface UpdatePriceDto {

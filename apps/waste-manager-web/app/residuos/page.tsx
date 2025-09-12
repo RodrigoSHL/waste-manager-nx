@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Plus, Search, Edit, Trash2, Loader2 } from "lucide-react"
 import { useWastes } from "@/hooks/use-market-prices"
 import { CreateWasteDto, UpdateWasteDto, Waste } from "@/lib/types/market-prices"
+import { WasteHierarchySelector } from "@/components/waste-hierarchy-selector"
 import { toast } from "sonner"
 
 export default function ResiduosPage() {
@@ -31,37 +32,52 @@ export default function ResiduosPage() {
   const [editingWaste, setEditingWaste] = useState<Waste | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Formulario para crear/editar
+  // Estado para jerarquía
+  const [selectedTypeId, setSelectedTypeId] = useState<number | undefined>()
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>()
+
+  // Formulario para crear/editar (actualizado para jerarquía)
   const [formData, setFormData] = useState<CreateWasteDto>({
+    wasteCategoryId: 0, // Se actualizará con selectedCategoryId
     code: '',
     name: '',
+    subproductName: '',
     description: '',
-    hazard_class: '',
+    hazardClass: '',
+    specifications: {},
   })
 
   const resetForm = () => {
     setFormData({
+      wasteCategoryId: 0,
       code: '',
       name: '',
+      subproductName: '',
       description: '',
-      hazard_class: '',
+      hazardClass: '',
+      specifications: {},
     })
+    setSelectedTypeId(undefined)
+    setSelectedCategoryId(undefined)
   }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.code.trim() || !formData.name.trim()) {
-      toast.error('El código y nombre son obligatorios')
+    if (!formData.code.trim() || !formData.name.trim() || !selectedCategoryId) {
+      toast.error('El código, nombre y categoría son obligatorios')
       return
     }
 
     setIsSubmitting(true)
     try {
       await createWaste({
+        wasteCategoryId: selectedCategoryId,
         code: formData.code.trim(),
         name: formData.name.trim(),
+        subproductName: formData.subproductName?.trim() || undefined,
         description: formData.description?.trim() || undefined,
-        hazard_class: formData.hazard_class?.trim() || undefined,
+        hazardClass: formData.hazardClass?.trim() || undefined,
+        specifications: Object.keys(formData.specifications || {}).length > 0 ? formData.specifications : undefined,
       })
       toast.success('Residuo creado exitosamente')
       setIsCreateDialogOpen(false)
@@ -76,33 +92,46 @@ export default function ResiduosPage() {
   const handleEdit = (waste: Waste) => {
     setEditingWaste(waste)
     setFormData({
+      wasteCategoryId: waste.wasteCategoryId,
       code: waste.code,
       name: waste.name,
+      subproductName: waste.subproductName || '',
       description: waste.description || '',
-      hazard_class: waste.hazard_class || '',
+      hazardClass: waste.hazardClass || '',
+      specifications: waste.specifications || {},
     })
+    // Buscar el tipo de la categoría para preseleccionar
+    setSelectedCategoryId(waste.wasteCategoryId)
+    // Aquí necesitarías obtener el tipo de la categoría, por ahora lo dejamos sin definir
+    setSelectedTypeId(undefined)
     setIsEditDialogOpen(true)
   }
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editingWaste) return
+    if (!editingWaste || !selectedCategoryId) return
 
     setIsSubmitting(true)
     try {
       const updateData: UpdateWasteDto = {}
       
+      if (selectedCategoryId !== editingWaste.wasteCategoryId) {
+        updateData.wasteCategoryId = selectedCategoryId
+      }
       if (formData.code.trim() !== editingWaste.code) {
         updateData.code = formData.code.trim()
       }
       if (formData.name.trim() !== editingWaste.name) {
         updateData.name = formData.name.trim()
       }
+      if (formData.subproductName?.trim() !== (editingWaste.subproductName || '')) {
+        updateData.subproductName = formData.subproductName?.trim() || undefined
+      }
       if (formData.description?.trim() !== (editingWaste.description || '')) {
         updateData.description = formData.description?.trim() || undefined
       }
-      if (formData.hazard_class?.trim() !== (editingWaste.hazard_class || '')) {
-        updateData.hazard_class = formData.hazard_class?.trim() || undefined
+      if (formData.hazardClass?.trim() !== (editingWaste.hazardClass || '')) {
+        updateData.hazardClass = formData.hazardClass?.trim() || undefined
       }
 
       if (Object.keys(updateData).length === 0) {
@@ -189,7 +218,7 @@ export default function ResiduosPage() {
             <CardHeader className="pb-2">
               <CardDescription>Con Clasificación de Peligro</CardDescription>
               <CardTitle className="text-4xl">
-                {wastes.filter(w => w.hazard_class).length}
+                {wastes.filter(w => w.hazardClass).length}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -229,6 +258,22 @@ export default function ResiduosPage() {
                   </DialogHeader>
                   <form onSubmit={handleCreate}>
                     <div className="grid gap-4 py-4">
+                      {/* Selector de Jerarquía */}
+                      <div className="grid grid-cols-4 items-start gap-4">
+                        <Label className="text-right mt-2">
+                          Jerarquía *
+                        </Label>
+                        <div className="col-span-3">
+                          <WasteHierarchySelector
+                            selectedTypeId={selectedTypeId}
+                            selectedCategoryId={selectedCategoryId}
+                            onTypeChange={setSelectedTypeId}
+                            onCategoryChange={setSelectedCategoryId}
+                            required
+                          />
+                        </div>
+                      </div>
+                      
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="code" className="text-right">
                           Código *
@@ -238,7 +283,7 @@ export default function ResiduosPage() {
                           value={formData.code}
                           onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
                           className="col-span-3"
-                          placeholder="ej: PET-01"
+                          placeholder="ej: PET-BOTTLE-DRINK"
                           required
                         />
                       </div>
@@ -251,8 +296,20 @@ export default function ResiduosPage() {
                           value={formData.name}
                           onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                           className="col-span-3"
-                          placeholder="ej: PET Transparente"
+                          placeholder="ej: Botella PET Bebida"
                           required
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="subproduct" className="text-right">
+                          Subproducto
+                        </Label>
+                        <Input
+                          id="subproduct"
+                          value={formData.subproductName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, subproductName: e.target.value }))}
+                          className="col-span-3"
+                          placeholder="ej: Botella de bebida"
                         />
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
@@ -274,10 +331,10 @@ export default function ResiduosPage() {
                         </Label>
                         <Input
                           id="hazard_class"
-                          value={formData.hazard_class}
-                          onChange={(e) => setFormData(prev => ({ ...prev, hazard_class: e.target.value }))}
+                          value={formData.hazardClass}
+                          onChange={(e) => setFormData(prev => ({ ...prev, hazardClass: e.target.value }))}
                           className="col-span-3"
-                          placeholder="ej: 3, 4.1, etc."
+                          placeholder="ej: H3, H4.1, etc."
                         />
                       </div>
                     </div>
@@ -316,6 +373,8 @@ export default function ResiduosPage() {
                   <TableRow>
                     <TableHead>Código</TableHead>
                     <TableHead>Nombre</TableHead>
+                    <TableHead>Subproducto</TableHead>
+                    <TableHead>Categoría</TableHead>
                     <TableHead>Descripción</TableHead>
                     <TableHead>Clase Peligro</TableHead>
                     <TableHead>Fecha Creación</TableHead>
@@ -325,7 +384,7 @@ export default function ResiduosPage() {
                 <TableBody>
                   {filteredWastes.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
+                      <TableCell colSpan={8} className="text-center py-8">
                         {searchTerm ? 'No se encontraron residuos que coincidan con la búsqueda' : 'No hay residuos registrados'}
                       </TableCell>
                     </TableRow>
@@ -335,10 +394,22 @@ export default function ResiduosPage() {
                         <TableCell className="font-medium">{waste.code}</TableCell>
                         <TableCell>{waste.name}</TableCell>
                         <TableCell>
+                          {waste.subproductName ? (
+                            <span className="text-sm">{waste.subproductName}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground italic">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">
+                            ID: {waste.wasteCategoryId}
+                          </span>
+                        </TableCell>
+                        <TableCell>
                           {waste.description ? (
                             <span className="text-sm text-muted-foreground">
-                              {waste.description.length > 50 
-                                ? `${waste.description.substring(0, 50)}...` 
+                              {waste.description.length > 30 
+                                ? `${waste.description.substring(0, 30)}...` 
                                 : waste.description}
                             </span>
                           ) : (
@@ -346,16 +417,16 @@ export default function ResiduosPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {waste.hazard_class ? (
+                          {waste.hazardClass ? (
                             <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
-                              {waste.hazard_class}
+                              {waste.hazardClass}
                             </span>
                           ) : (
                             <span className="text-sm text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell>
-                          {new Date(waste.created_at).toLocaleDateString()}
+                          {new Date(waste.createdAt).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -395,6 +466,22 @@ export default function ResiduosPage() {
             </DialogHeader>
             <form onSubmit={handleUpdate}>
               <div className="grid gap-4 py-4">
+                {/* Selector de Jerarquía para Edición */}
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right mt-2">
+                    Jerarquía *
+                  </Label>
+                  <div className="col-span-3">
+                    <WasteHierarchySelector
+                      selectedTypeId={selectedTypeId}
+                      selectedCategoryId={selectedCategoryId}
+                      onTypeChange={setSelectedTypeId}
+                      onCategoryChange={setSelectedCategoryId}
+                      required
+                    />
+                  </div>
+                </div>
+                
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="edit-code" className="text-right">
                     Código *
@@ -420,6 +507,17 @@ export default function ResiduosPage() {
                   />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-subproduct" className="text-right">
+                    Subproducto
+                  </Label>
+                  <Input
+                    id="edit-subproduct"
+                    value={formData.subproductName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, subproductName: e.target.value }))}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="edit-description" className="text-right">
                     Descripción
                   </Label>
@@ -437,8 +535,8 @@ export default function ResiduosPage() {
                   </Label>
                   <Input
                     id="edit-hazard_class"
-                    value={formData.hazard_class}
-                    onChange={(e) => setFormData(prev => ({ ...prev, hazard_class: e.target.value }))}
+                    value={formData.hazardClass}
+                    onChange={(e) => setFormData(prev => ({ ...prev, hazardClass: e.target.value }))}
                     className="col-span-3"
                   />
                 </div>
