@@ -18,7 +18,9 @@ import {
   PriceOverview
 } from '@/lib/types/market-prices';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.NODE_ENV === 'development' 
+  ? 'http://localhost:3000/api'
+  : 'https://waste-api-git-main-shls-projects-a6bf1b30.vercel.app/api';
 
 class MarketPricesService {
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {

@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Upload, CheckCircle, XCircle, AlertTriangle, Download, FileSpreadsheet } from "lucide-react"
+import { API_CONFIG } from "@/lib/config/api"
 
 interface BulkUploadResult {
   success: boolean
@@ -28,7 +29,7 @@ interface BulkUploadResult {
     row: number
     field?: string
     message: string
-    data?: any
+    data?: Record<string, unknown>
   }>
   duplicates: Array<{
     row: number
@@ -62,12 +63,39 @@ export default function CargaMasivaPage() {
   const [result, setResult] = useState<BulkUploadResult | null>(null)
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
   const [loadingTemplate, setLoadingTemplate] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0]
     if (selectedFile) {
       setFile(selectedFile)
       setResult(null) // Limpiar resultados anteriores
+    }
+  }
+
+  const handleDragOver = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault()
+    setIsDragOver(false)
+    
+    const droppedFile = event.dataTransfer.files[0]
+    if (droppedFile && (droppedFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                        droppedFile.type === 'application/vnd.ms-excel' ||
+                        droppedFile.name.endsWith('.xlsx') || 
+                        droppedFile.name.endsWith('.xls'))) {
+      setFile(droppedFile)
+      setResult(null)
+    } else {
+      alert('Por favor, selecciona un archivo Excel (.xlsx o .xls)')
     }
   }
 
@@ -81,7 +109,7 @@ export default function CargaMasivaPage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch('/api/bulk-upload/excel', {
+      const response = await fetch(API_CONFIG.ENDPOINTS.BULK_UPLOAD_EXCEL, {
         method: 'POST',
         body: formData,
       })
@@ -112,7 +140,7 @@ export default function CargaMasivaPage() {
   const downloadTemplate = async () => {
     setLoadingTemplate(true)
     try {
-      const response = await fetch('/api/bulk-upload/template', {
+      const response = await fetch(API_CONFIG.ENDPOINTS.BULK_UPLOAD_TEMPLATE, {
         method: 'POST',
       })
 
@@ -139,7 +167,7 @@ export default function CargaMasivaPage() {
     }
   }
 
-  const convertToCSV = (data: any[]): string => {
+  const convertToCSV = (data: Record<string, unknown>[]): string => {
     if (data.length === 0) return ''
     
     const headers = Object.keys(data[0]).join(',')
@@ -182,13 +210,37 @@ export default function CargaMasivaPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileChange}
-                  disabled={uploading}
-                />
+              <div className="flex items-center justify-center w-full">
+                <label
+                  htmlFor="file-upload"
+                  className={`flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl cursor-pointer backdrop-blur-sm transition-all duration-300 ${
+                    isDragOver 
+                      ? 'border-blue-500 bg-gradient-to-br from-blue-100/80 to-indigo-100/80 shadow-lg' 
+                      : 'border-slate-300/60 bg-gradient-to-br from-slate-50/80 to-blue-50/80 hover:from-blue-50/80 hover:to-indigo-50/80 hover:border-blue-400/60 hover:shadow-lg'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <Upload className={`w-8 h-8 mb-4 transition-colors ${isDragOver ? 'text-blue-600' : 'text-gray-500'}`} />
+                    <p className="mb-2 text-sm text-gray-500">
+                      <span className="font-semibold">
+                        {isDragOver ? 'Suelta tu archivo aquí' : 'Haz clic para subir'}
+                      </span> 
+                      {!isDragOver && ' o arrastra y suelta'}
+                    </p>
+                    <p className="text-xs text-gray-500">Excel (.xlsx, .xls)</p>
+                  </div>
+                  <Input
+                    id="file-upload"
+                    type="file"
+                    className="hidden"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileChange}
+                    disabled={uploading}
+                  />
+                </label>
               </div>
 
               {file && (
