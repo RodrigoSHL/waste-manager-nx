@@ -1,7 +1,7 @@
 // Configuración centralizada de API URLs
 const API_BASE_URL = process.env.NODE_ENV === 'development' 
   ? 'http://localhost:3000/api'
-  : 'https://waste-api-git-main-shls-projects-a6bf1b30.vercel.app/api'
+  : 'https://waste-manager-nx.onrender.com/api'
 
 export const API_CONFIG = {
   BASE_URL: API_BASE_URL,
