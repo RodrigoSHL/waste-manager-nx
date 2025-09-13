@@ -92,9 +92,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarFooter className="bg-gradient-to-r from-slate-50/90 to-white/90 backdrop-blur-sm border-t border-slate-200/50">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton>
-              <Settings />
-              <span>Configuración</span>
+            <SidebarMenuButton
+              asChild
+              className="hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-indigo-50/80 transition-all duration-200 hover:shadow-sm"
+            >
+              <Link href="/configuracion">
+                <Settings />
+                <span>Configuración</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
