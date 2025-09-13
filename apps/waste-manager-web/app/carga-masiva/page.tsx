@@ -10,77 +10,151 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Upload, CheckCircle, XCircle, AlertTriangle, Download } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Upload, CheckCircle, XCircle, AlertTriangle, Download, FileSpreadsheet } from "lucide-react"
 
-interface UploadResult {
-  fileName: string
+interface BulkUploadResult {
+  success: boolean
   totalRows: number
-  successRows: number
-  errorRows: number
-  errors: string[]
-  status: "processing" | "completed" | "error"
+  processed: number
+  created: {
+    wasteTypes: number
+    wasteCategories: number
+    wastes: number
+  }
+  errors: Array<{
+    row: number
+    field?: string
+    message: string
+    data?: any
+  }>
+  duplicates: Array<{
+    row: number
+    type: string
+    code: string
+    message: string
+  }>
+  summary: string
+}
+
+interface TemplateResponse {
+  message: string
+  template: Array<{
+    tipo_codigo: string
+    tipo_nombre: string
+    categoria_codigo: string
+    categoria_nombre: string
+    producto_codigo: string
+    producto_nombre: string
+    subproducto?: string
+    descripcion?: string
+    clase_peligro?: string
+    especificaciones_tecnicas?: string
+  }>
+  instructions: string[]
 }
 
 export default function CargaMasivaPage() {
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [isUploading, setIsUploading] = useState(false)
-  const [uploadResults, setUploadResults] = useState<UploadResult[]>([])
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [result, setResult] = useState<BulkUploadResult | null>(null)
+  const [template, setTemplate] = useState<TemplateResponse | null>(null)
+  const [loadingTemplate, setLoadingTemplate] = useState(false)
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+      setResult(null) // Limpiar resultados anteriores
+    }
+  }
+
+  const handleUpload = async () => {
     if (!file) return
 
-    setIsUploading(true)
-    setUploadProgress(0)
+    setUploading(true)
+    setResult(null)
 
-    // Simular proceso de carga
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsUploading(false)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
 
-          // Simular resultado de carga
-          const result: UploadResult = {
-            fileName: file.name,
-            totalRows: 150,
-            successRows: 142,
-            errorRows: 8,
-            errors: [
-              "Fila 15: Tipo de residuo no válido",
-              "Fila 23: Cantidad debe ser mayor a 0",
-              "Fila 45: Dispositor no encontrado",
-              "Fila 67: Precio de venta inválido",
-              "Fila 89: Fecha en formato incorrecto",
-              "Fila 102: Campo obligatorio vacío",
-              "Fila 134: Duplicado encontrado",
-              "Fila 147: Valor fuera de rango",
-            ],
-            status: "completed",
-          }
-
-          setUploadResults((prev) => [result, ...prev])
-          return 100
-        }
-        return prev + 10
+      const response = await fetch('/api/bulk-upload/excel', {
+        method: 'POST',
+        body: formData,
       })
-    }, 200)
-  }
 
-  const downloadTemplate = () => {
-    // Simular descarga de plantilla
-    console.log("Descargando plantilla...")
-  }
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Error uploading file')
+      }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckCircle className="h-4 w-4 text-green-600" />
-      case "error":
-        return <XCircle className="h-4 w-4 text-red-600" />
-      default:
-        return <AlertTriangle className="h-4 w-4 text-yellow-600" />
+      const uploadResult: BulkUploadResult = await response.json()
+      setResult(uploadResult)
+    } catch (error) {
+      console.error('Upload error:', error)
+      setResult({
+        success: false,
+        totalRows: 0,
+        processed: 0,
+        created: { wasteTypes: 0, wasteCategories: 0, wastes: 0 },
+        errors: [{ row: 0, message: error instanceof Error ? error.message : 'Error desconocido' }],
+        duplicates: [],
+        summary: 'Error en la carga'
+      })
+    } finally {
+      setUploading(false)
     }
+  }
+
+  const downloadTemplate = async () => {
+    setLoadingTemplate(true)
+    try {
+      const response = await fetch('/api/bulk-upload/template', {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        const templateData: TemplateResponse = await response.json()
+        setTemplate(templateData)
+
+        // Convertir template a CSV para descarga
+        const csvContent = convertToCSV(templateData.template)
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.setAttribute('href', url)
+        link.setAttribute('download', 'plantilla_carga_masiva.csv')
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+    } catch (error) {
+      console.error('Error downloading template:', error)
+    } finally {
+      setLoadingTemplate(false)
+    }
+  }
+
+  const convertToCSV = (data: any[]): string => {
+    if (data.length === 0) return ''
+    
+    const headers = Object.keys(data[0]).join(',')
+    const rows = data.map(row => 
+      Object.values(row).map(value => 
+        typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+      ).join(',')
+    ).join('\n')
+    
+    return `${headers}\n${rows}`
+  }
+
+  const getSuccessRate = (): number => {
+    if (!result || result.totalRows === 0) return 0
+    return (result.processed / result.totalRows) * 100
   }
 
   return (
@@ -89,217 +163,257 @@ export default function CargaMasivaPage() {
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
-          <h1 className="text-lg font-semibold">Carga Masiva de Datos</h1>
+          <h1 className="text-lg font-semibold">Carga Masiva de Residuos</h1>
         </div>
       </header>
 
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        {/* Instrucciones y plantilla */}
+        {/* Cards de instrucciones y carga */}
         <div className="grid gap-4 md:grid-cols-2">
+          {/* Card de carga */}
           <Card className="card">
             <CardHeader>
-              <CardTitle>Instrucciones de Carga</CardTitle>
-              <CardDescription>Sigue estos pasos para cargar datos masivamente</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5" />
+                Subir Archivo
+              </CardTitle>
+              <CardDescription>
+                Selecciona un archivo Excel (.xlsx, .xls) con los datos de residuos
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <h4 className="font-medium">1. Descarga la plantilla</h4>
-                <p className="text-sm text-muted-foreground">
-                  Utiliza nuestra plantilla Excel/CSV con el formato correcto
-                </p>
-                <Button variant="outline" className="btn-secondary bg-transparent" onClick={downloadTemplate}>
-                  <Download className="mr-2 h-4 w-4 icon-hover" />
-                  Descargar Plantilla
-                </Button>
+                <Input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileChange}
+                  disabled={uploading}
+                />
               </div>
 
-              <div className="space-y-2">
-                <h4 className="font-medium">2. Completa los datos</h4>
-                <p className="text-sm text-muted-foreground">Llena la plantilla con la información de tus residuos</p>
-              </div>
+              {file && (
+                <Alert>
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <AlertDescription>
+                    Archivo seleccionado: {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                  </AlertDescription>
+                </Alert>
+              )}
 
-              <div className="space-y-2">
-                <h4 className="font-medium">3. Sube el archivo</h4>
-                <p className="text-sm text-muted-foreground">Formatos soportados: .xlsx, .xls, .csv</p>
-              </div>
+              <Button 
+                onClick={handleUpload} 
+                disabled={!file || uploading}
+                className="w-full"
+              >
+                {uploading ? 'Procesando...' : 'Cargar Datos'}
+              </Button>
+
+              {uploading && (
+                <div className="space-y-2">
+                  <Progress value={50} className="w-full" />
+                  <p className="text-sm text-muted-foreground text-center">
+                    Procesando archivo...
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
+          {/* Card de plantilla */}
           <Card className="card">
             <CardHeader>
-              <CardTitle>Formato Requerido</CardTitle>
-              <CardDescription>Campos obligatorios en tu archivo</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5" />
+                Plantilla Excel
+              </CardTitle>
+              <CardDescription>
+                Descarga la plantilla con el formato requerido
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="font-medium">Tipo de Residuo</span>
-                  <span className="text-muted-foreground">Texto</span>
+            <CardContent className="space-y-4">
+              <Button 
+                onClick={downloadTemplate}
+                disabled={loadingTemplate}
+                variant="outline"
+                className="w-full"
+              >
+                {loadingTemplate ? 'Generando...' : 'Descargar Plantilla'}
+              </Button>
+
+              {template && (
+                <div className="space-y-2">
+                  <h4 className="font-medium">Instrucciones:</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {template.instructions.map((instruction, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="text-primary">•</span>
+                        <span>{instruction}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Nombre Específico</span>
-                  <span className="text-muted-foreground">Texto</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Cantidad (kg)</span>
-                  <span className="text-muted-foreground">Número</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Dispositor</span>
-                  <span className="text-muted-foreground">Texto</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Precio Venta</span>
-                  <span className="text-muted-foreground">Número</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Precio Recepción</span>
-                  <span className="text-muted-foreground">Número</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Fecha</span>
-                  <span className="text-muted-foreground">DD/MM/YYYY</span>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Área de carga */}
-        <Card className="card">
-          <CardHeader>
-            <CardTitle>Subir Archivo</CardTitle>
-            <CardDescription>Selecciona tu archivo Excel o CSV para procesar</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-center w-full">
-                <label
-                  htmlFor="file-upload"
-                  className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-slate-300/60 rounded-xl cursor-pointer bg-gradient-to-br from-slate-50/80 to-blue-50/80 hover:from-blue-50/80 hover:to-indigo-50/80 backdrop-blur-sm transition-all duration-300 hover:border-blue-400/60 hover:shadow-lg"
-                >
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="w-8 h-8 mb-4 text-gray-500" />
-                    <p className="mb-2 text-sm text-gray-500">
-                      <span className="font-semibold">Haz clic para subir</span> o arrastra y suelta
-                    </p>
-                    <p className="text-xs text-gray-500">Excel (.xlsx, .xls) o CSV</p>
-                  </div>
-                  <Input
-                    id="file-upload"
-                    type="file"
-                    className="hidden"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleFileUpload}
-                    disabled={isUploading}
-                  />
-                </label>
-              </div>
-
-              {isUploading && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Procesando archivo...</span>
-                    <span className="text-sm text-muted-foreground">{uploadProgress}%</span>
-                  </div>
-                  <Progress value={uploadProgress} className="w-full" />
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Resultados de carga */}
-        {uploadResults.length > 0 && (
+        {/* Resultados */}
+        {result && (
           <Card className="card">
             <CardHeader>
-              <CardTitle>Historial de Cargas</CardTitle>
-              <CardDescription>Resultados de las cargas masivas realizadas</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                {result.success ? (
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500" />
+                )}
+                Resultados de la Carga
+              </CardTitle>
+              <CardDescription>{result.summary}</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {uploadResults.map((result, index) => (
-                  <div
-                    key={index}
-                    className="border border-slate-200/60 rounded-xl p-4 bg-gradient-to-r from-white/90 to-slate-50/90 backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(result.status)}
-                        <span className="font-medium">{result.fileName}</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {result.successRows}/{result.totalRows} registros procesados
-                      </div>
-                    </div>
+              <Tabs defaultValue="summary" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="summary">Resumen</TabsTrigger>
+                  <TabsTrigger value="created">Creados</TabsTrigger>
+                  <TabsTrigger value="errors">Errores</TabsTrigger>
+                  <TabsTrigger value="duplicates">Duplicados</TabsTrigger>
+                </TabsList>
 
-                    <div className="grid grid-cols-3 gap-4 mb-3">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">{result.successRows}</div>
-                        <div className="text-xs text-muted-foreground">Exitosos</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">{result.errorRows}</div>
-                        <div className="text-xs text-muted-foreground">Errores</div>
-                      </div>
-                      <div className="text-center">
+                <TabsContent value="summary" className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <Card>
+                      <CardContent className="pt-6">
                         <div className="text-2xl font-bold">{result.totalRows}</div>
-                        <div className="text-xs text-muted-foreground">Total</div>
-                      </div>
-                    </div>
-
-                    {result.errorRows > 0 && (
-                      <Alert className="alert-enhanced">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription>
-                          <details className="mt-2">
-                            <summary className="cursor-pointer font-medium">
-                              Ver {result.errorRows} errores encontrados
-                            </summary>
-                            <div className="mt-2 space-y-1">
-                              {result.errors.map((error, errorIndex) => (
-                                <div key={errorIndex} className="text-sm text-red-600">
-                                  • {error}
-                                </div>
-                              ))}
-                            </div>
-                          </details>
-                        </AlertDescription>
-                      </Alert>
-                    )}
+                        <p className="text-xs text-muted-foreground">Total filas</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold text-green-600">{result.processed}</div>
+                        <p className="text-xs text-muted-foreground">Procesadas</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold">
+                          {getSuccessRate().toFixed(1)}%
+                        </div>
+                        <p className="text-xs text-muted-foreground">Tasa de éxito</p>
+                      </CardContent>
+                    </Card>
                   </div>
-                ))}
-              </div>
+
+                  <Progress value={getSuccessRate()} className="w-full" />
+                </TabsContent>
+
+                <TabsContent value="created" className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{result.created.wasteTypes}</Badge>
+                      <span className="text-sm">Tipos de residuo</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{result.created.wasteCategories}</Badge>
+                      <span className="text-sm">Categorías</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{result.created.wastes}</Badge>
+                      <span className="text-sm">Productos</span>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="errors">
+                  {result.errors.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fila</TableHead>
+                          <TableHead>Campo</TableHead>
+                          <TableHead>Mensaje</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {result.errors.map((error, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{error.row}</TableCell>
+                            <TableCell>{error.field || '-'}</TableCell>
+                            <TableCell>{error.message}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <CheckCircle className="mx-auto h-12 w-12 mb-4" />
+                      <p>No hay errores</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="duplicates">
+                  {result.duplicates.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fila</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Código</TableHead>
+                          <TableHead>Mensaje</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {result.duplicates.map((duplicate, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{duplicate.row}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{duplicate.type}</Badge>
+                            </TableCell>
+                            <TableCell className="font-mono">{duplicate.code}</TableCell>
+                            <TableCell>{duplicate.message}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <AlertTriangle className="mx-auto h-12 w-12 mb-4" />
+                      <p>No hay duplicados</p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         )}
 
-        {/* Validaciones y reglas */}
+        {/* Formato requerido */}
         <Card className="card">
           <CardHeader>
-            <CardTitle>Reglas de Validación</CardTitle>
-            <CardDescription>Criterios que debe cumplir tu archivo para ser procesado correctamente</CardDescription>
+            <CardTitle>Formato de Excel Requerido</CardTitle>
+            <CardDescription>Estructura que debe tener tu archivo Excel</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-3">
-                <h4 className="font-medium text-green-600">✓ Datos Válidos</h4>
+                <h4 className="font-medium text-green-600">✓ Columnas Requeridas</h4>
                 <ul className="text-sm space-y-1 text-muted-foreground">
-                  <li>• Tipos de residuo: Plástico, Cartón, Metal, Orgánico, Vidrio</li>
-                  <li>• Cantidades mayores a 0</li>
-                  <li>• Precios en formato numérico (ej: 2.50)</li>
-                  <li>• Fechas en formato DD/MM/YYYY</li>
-                  <li>• Dispositores registrados en el sistema</li>
+                  <li>• <strong>tipo_codigo:</strong> Código único del tipo (máx 20 caracteres)</li>
+                  <li>• <strong>tipo_nombre:</strong> Nombre del tipo de residuo</li>
+                  <li>• <strong>categoria_codigo:</strong> Código de categoría (máx 50 caracteres)</li>
+                  <li>• <strong>categoria_nombre:</strong> Nombre de la categoría</li>
+                  <li>• <strong>producto_codigo:</strong> Código del producto (máx 50 caracteres)</li>
+                  <li>• <strong>producto_nombre:</strong> Nombre del producto</li>
                 </ul>
               </div>
               <div className="space-y-3">
-                <h4 className="font-medium text-red-600">✗ Errores Comunes</h4>
+                <h4 className="font-medium text-blue-600">○ Columnas Opcionales</h4>
                 <ul className="text-sm space-y-1 text-muted-foreground">
-                  <li>• Campos obligatorios vacíos</li>
-                  <li>• Tipos de residuo no reconocidos</li>
-                  <li>• Cantidades negativas o cero</li>
-                  <li>• Formatos de fecha incorrectos</li>
-                  <li>• Dispositores inexistentes</li>
+                  <li>• <strong>subproducto:</strong> Nombre del subproducto</li>
+                  <li>• <strong>descripcion:</strong> Descripción detallada</li>
+                  <li>• <strong>clase_peligro:</strong> Clasificación de peligrosidad</li>
+                  <li>• <strong>especificaciones_tecnicas:</strong> JSON con especificaciones</li>
                 </ul>
               </div>
             </div>

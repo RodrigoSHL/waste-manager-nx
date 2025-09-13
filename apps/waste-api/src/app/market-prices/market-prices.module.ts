@@ -17,9 +17,11 @@ import { MarketPricesRepository } from './repositories/market-prices.repository'
 
 // Services
 import { MarketPricesService } from './services/market-prices.service';
+import { BulkUploadService } from './services/bulk-upload.service';
 
 // Controllers
 import { MarketPricesController } from './market-prices.controller';
+import { BulkUploadController } from './controllers/bulk-upload.controller';
 
 // Seeds
 import { SeedMarketPrices } from './seed/seed-market-prices';
@@ -38,10 +40,11 @@ import { SeedMarketPrices } from './seed/seed-market-prices';
       PriceHistory,
     ]),
   ],
-  controllers: [MarketPricesController],
+  controllers: [MarketPricesController, BulkUploadController],
   providers: [
     MarketPricesRepository,
     MarketPricesService,
+    BulkUploadService,
     SeedMarketPrices,
   ],
   exports: [
