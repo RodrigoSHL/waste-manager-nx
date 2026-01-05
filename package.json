@@ -1,6 +1,6 @@
 {
   "name": "@waste-manager/source",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "license": "MIT",
   "scripts": {
     "build:web": "nx build waste-manager-web",
