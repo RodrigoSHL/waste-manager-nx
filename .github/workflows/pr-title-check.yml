@@ -26,12 +26,19 @@ jobs:
             ci
             chore
             revert
-          requireScope: false
-          subjectPattern: ^[A-Z].+$
+          requireScope: true
+          scopes: |
+            waste-api
+            manager-web
+            deps
+            ci
+          subjectPattern: ^[A-Z].+(\s+-\s+WST-\d+)?$
           subjectPatternError: |
-            El título debe comenzar con mayúscula.
+            El título debe seguir el formato: tipo(scope): Descripción - WST-###
             
             Ejemplos válidos:
-            - feat: Agregar módulo de reportes
-            - fix: Corregir cálculo de valorizaciones
-            - chore: Actualizar dependencias
+            - feat(waste-api): Add market prices endpoint - WST-123
+            - fix(manager-web): Correct dashboard calculation - WST-456
+            - chore(deps): Update dependencies
+            
+            Scopes válidos: waste-api, manager-web, deps, ci
